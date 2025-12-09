@@ -1,0 +1,33 @@
+{
+  "playlists": [
+    {
+      "name": "Demo IPTV Indonesia",
+      "url": "http://example.com/id-playlist.m3u",
+      "type": "m3u"
+    },
+    {
+      "name": "International Sports",
+      "url": "http://example.com/sports-playlist.m3u",
+      "type": "m3u"
+    }
+  ],
+  "relays": [
+    {
+      "name": "Sport TV Relay with Failover",
+      "output_path": "sport-tv",
+      "source_urls": [
+        "http://primary-cdn.example.com/sport/stream.m3u8",
+        "http://backup-cdn.example.com/sport/stream.m3u8",
+        "http://fallback-cdn.example.com/sport/stream.m3u8"
+      ]
+    },
+    {
+      "name": "Movie Channel Relay",
+      "output_path": "movies",
+      "source_urls": [
+        "http://cdn1.example.com/movies/stream.m3u8",
+        "http://cdn2.example.com/movies/stream.m3u8"
+      ]
+    }
+  ]
+}

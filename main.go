@@ -1,0 +1,88 @@
+package main
+
+import (
+	"iptv-panel/database"
+	"iptv-panel/handlers"
+	"log"
+	"net/http"
+	"os"
+
+	"github.com/gorilla/mux"
+)
+
+func main() {
+	// Initialize database
+	dbPath := os.Getenv("DB_PATH")
+	if dbPath == "" {
+		dbPath = "./iptv.db"
+	}
+
+	if err := database.InitDB(dbPath); err != nil {
+		log.Fatal("Failed to initialize database:", err)
+	}
+	defer database.Close()
+
+	// Setup router
+	r := mux.NewRouter()
+
+	// API routes
+	api := r.PathPrefix("/api").Subrouter()
+	
+	// Stats
+	api.HandleFunc("/stats", handlers.GetStats).Methods("GET")
+	
+	// Playlists
+	api.HandleFunc("/playlists", handlers.GetPlaylists).Methods("GET")
+	api.HandleFunc("/playlists/import", handlers.ImportPlaylist).Methods("POST")
+	api.HandleFunc("/playlists/{id}", handlers.DeletePlaylist).Methods("DELETE")
+	api.HandleFunc("/playlists/{id}/channels", handlers.GetChannels).Methods("GET")
+	api.HandleFunc("/playlists/{id}/export", handlers.ExportM3U).Methods("GET")
+	
+	// Channels
+	api.HandleFunc("/channels/search", handlers.SearchChannels).Methods("GET")
+	api.HandleFunc("/channels/{id}/toggle", handlers.UpdateChannelStatus).Methods("POST")
+	api.HandleFunc("/channels/{id}", handlers.DeleteChannel).Methods("DELETE")
+	api.HandleFunc("/channels/batch-delete", handlers.BatchDeleteChannels).Methods("POST")
+	
+	// Proxy channel stream
+	api.HandleFunc("/proxy/channel/{id}", handlers.ProxyChannel).Methods("GET")
+	api.HandleFunc("/proxy/channel/{id}/hls", handlers.ProxyChannelHLS).Methods("GET")
+	
+	// Relays
+	api.HandleFunc("/relays", handlers.GetRelays).Methods("GET")
+	api.HandleFunc("/relays", handlers.CreateRelay).Methods("POST")
+	api.HandleFunc("/relays/{id}", handlers.DeleteRelay).Methods("DELETE")
+	
+	// Stream status
+	api.HandleFunc("/streams/status", handlers.GetStreamStatus).Methods("GET")
+	api.HandleFunc("/streams/{id}/status", handlers.GetStreamStatusByID).Methods("GET")
+	
+	// Users
+	api.HandleFunc("/users", handlers.GetUsers).Methods("GET")
+	api.HandleFunc("/users", handlers.CreateUser).Methods("POST")
+	api.HandleFunc("/users/{id}", handlers.UpdateUser).Methods("PUT")
+	api.HandleFunc("/users/{id}", handlers.DeleteUser).Methods("DELETE")
+	api.HandleFunc("/users/{id}/reset-password", handlers.ResetUserPassword).Methods("POST")
+	api.HandleFunc("/users/{id}/connections", handlers.GetUserConnections).Methods("GET")
+	
+	// Stream relay endpoints (on-demand, multi-client)
+	r.HandleFunc("/stream/{path}", handlers.StreamRelay).Methods("GET")
+	r.HandleFunc("/stream/{path}/hls", handlers.StreamRelayHLS).Methods("GET")
+	r.HandleFunc("/stream/{path}/hls/{segment}", handlers.StreamRelayHLSSegment).Methods("GET")
+
+	// Serve static files
+	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./static")))
+
+	// Get port from environment or use default
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("🎬 IPTV Panel server started on http://localhost:%s", port)
+	log.Printf("📺 Open your browser and navigate to http://localhost:%s", port)
+	
+	if err := http.ListenAndServe(":"+port, r); err != nil {
+		log.Fatal("Server failed:", err)
+	}
+}

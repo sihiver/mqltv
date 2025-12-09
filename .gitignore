@@ -1,0 +1,4 @@
+iptv-panel
+iptv.db
+*.log
+nohup.out

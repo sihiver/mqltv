@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPTV Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-card h3 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+        
+        .stat-card p {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e0e0e0;
+            background: #f8f9fa;
+        }
+        
+        .tab {
+            padding: 20px 30px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+        }
+        
+        .tab:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+        
+        .tab.active {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 30px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border 0.3s;
+        }
+        
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.9em;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        thead {
+            background: #f8f9fa;
+        }
+        
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        th {
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .badge-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .badge-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .badge-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .search-box {
+            margin-bottom: 20px;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .url-list {
+            margin-top: 10px;
+        }
+        
+        .url-item {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .url-item input {
+            flex: 1;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 1.2em;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        
+        .empty-state h3 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+        
+        .url-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #667eea;
+        }
+        
+        .url-box label {
+            display: block;
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        
+        .url-display {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .url-display input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.9em;
+            background: white;
+        }
+        
+        .url-display input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn-copy {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        
+        .btn-copy:hover {
+            background: #5568d3;
+        }
+        
+        .btn-copy.copied {
+            background: #28a745;
+        }
+        
+        .url-info {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎬 IPTV Panel</h1>
+            <p>Kelola Playlist & Stream Relay IPTV Anda</p>
+        </header>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <h3 id="totalPlaylists">0</h3>
+                <p>Total Playlists</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="totalChannels">0</h3>
+                <p>Total Channels</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="activeChannels">0</h3>
+                <p>Active Channels</p>
+            </div>
+            <div class="stat-card">
+                <h3 id="totalRelays">0</h3>
+                <p>Total Relays</p>
+            </div>
+        </div>
+        
+        <!-- Bandwidth Monitor -->
+        <div style="padding: 20px 30px; background: #f8f9fa; border-top: 2px solid #e0e0e0;">
+            <h3 style="margin: 0 0 15px 0; color: #667eea;">📊 Bandwidth Monitor</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <h4 style="margin: 0 0 10px 0; color: #28a745;">⬇️ Download (From Provider)</h4>
+                    <div style="font-size: 2em; font-weight: bold; color: #28a745;" id="downloadSpeed">0 Mbps</div>
+                    <div style="font-size: 0.9em; color: #666; margin-top: 5px;" id="downloadTotal">Total: 0 MB</div>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <h4 style="margin: 0 0 10px 0; color: #007bff;">⬆️ Upload (To Clients)</h4>
+                    <div style="font-size: 2em; font-weight: bold; color: #007bff;" id="uploadSpeed">0 Mbps</div>
+                    <div style="font-size: 0.9em; color: #666; margin-top: 5px;" id="uploadTotal">Total: 0 MB</div>
+                </div>
+            </div>
+            <div style="margin-top: 15px; font-size: 0.9em; color: #666; text-align: center;">
+                <span id="activeStreamsInfo">No active streams</span> • Updates every 3 seconds
+            </div>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('playlists', event)">Playlists</button>
+            <button class="tab" onclick="switchTab('channels', event)">Channels</button>
+            <button class="tab" onclick="switchTab('relays', event)">Relays</button>
+            <button class="tab" onclick="switchTab('users', event)">Users</button>
+            <button class="tab" onclick="switchTab('import', event)">Import M3U</button>
+        </div>
+        
+        <div id="playlists" class="tab-content active">
+            <h2>Daftar Playlists</h2>
+            <div id="playlistsList"></div>
+        </div>
+        
+        <div id="channels" class="tab-content">
+            <h2>Daftar Channels</h2>
+            <div style="display: flex; gap: 12px; margin-bottom: 20px; align-items: stretch;">
+                <div class="search-box" style="flex: 1;">
+                    <input type="text" id="channelSearch" placeholder="🔍 Cari channel..." oninput="debounceSearch()">
+                </div>
+                <select id="categoryFilter" onchange="filterByCategory()" style="flex: 1; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1em; cursor: pointer;">
+                    <option value="">📂 Semua Kategori</option>
+                </select>
+                <button class="btn btn-danger btn-sm" onclick="deleteCategoryBatch()" id="deleteCategoryBtn" disabled style="white-space: nowrap; min-width: 120px;">
+                    🗑️ Hapus
+                </button>
+            </div>
+            <div id="channelsList"></div>
+        </div>
+        
+        <div id="relays" class="tab-content">
+            <h2>Stream Relays</h2>
+            <button class="btn btn-primary" onclick="showCreateRelay()">+ Buat Relay Baru</button>
+            
+            <div id="createRelayForm" style="display: none; margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                <h3>Buat Relay Baru</h3>
+                <div class="form-group">
+                    <label>Nama Relay</label>
+                    <input type="text" id="relayName" placeholder="Contoh: Sport TV Relay">
+                </div>
+                <div class="form-group">
+                    <label>Output Path</label>
+                    <input type="text" id="relayPath" placeholder="Contoh: sport-tv">
+                    <small>URL akan menjadi: /stream/sport-tv</small>
+                </div>
+                <div class="form-group">
+                    <label>Source URLs (Failover)</label>
+                    <div class="url-list" id="sourceUrlsList">
+                        <div class="url-item">
+                            <input type="text" class="source-url" placeholder="http://source1.com/stream.m3u8">
+                            <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">Hapus</button>
+                        </div>
+                    </div>
+                    <button class="btn btn-success btn-sm" onclick="addSourceUrl()">+ Tambah URL</button>
+                </div>
+                <button class="btn btn-primary" onclick="createRelay()">Buat Relay</button>
+                <button class="btn" onclick="hideCreateRelay()">Batal</button>
+            </div>
+            
+            <div id="relaysList"></div>
+        </div>
+        
+        <div id="users" class="tab-content">
+            <h2>User Management</h2>
+            <button class="btn btn-primary" onclick="showCreateUser()">➕ Tambah User</button>
+            
+            <div id="createUserForm" style="display: none; margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                <h3>Buat User Baru</h3>
+                <div class="form-group">
+                    <label>Username *</label>
+                    <input type="text" id="newUsername" placeholder="Masukkan username">
+                </div>
+                <div class="form-group">
+                    <label>Password *</label>
+                    <input type="password" id="newPassword" placeholder="Masukkan password">
+                </div>
+                <div class="form-group">
+                    <label>Nama Lengkap</label>
+                    <input type="text" id="newFullName" placeholder="Nama lengkap user">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="newEmail" placeholder="email@example.com">
+                </div>
+                <div class="form-group">
+                    <label>Max Koneksi</label>
+                    <input type="number" id="newMaxConnections" value="1" min="1" max="10">
+                </div>
+                <div class="form-group">
+                    <label>Durasi (Hari)</label>
+                    <input type="number" id="newDurationDays" placeholder="Jumlah hari aktif (kosongkan untuk unlimited)">
+                </div>
+                <div class="form-group">
+                    <label>Catatan</label>
+                    <textarea id="newNotes" placeholder="Catatan tambahan..." rows="3"></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="createUser()">Buat User</button>
+                <button class="btn" onclick="hideCreateUser()">Batal</button>
+            </div>
+            
+            <div id="usersList"></div>
+        </div>
+        
+        <div id="import" class="tab-content">
+            <h2>Import M3U Playlist</h2>
+            <div style="max-width: 600px;">
+                <div class="form-group">
+                    <label>Nama Playlist</label>
+                    <input type="text" id="playlistName" placeholder="Contoh: My IPTV">
+                </div>
+                <div class="form-group">
+                    <label>M3U URL</label>
+                    <input type="text" id="playlistUrl" placeholder="http://example.com/playlist.m3u">
+                </div>
+                <button class="btn btn-primary" onclick="importPlaylist()">Import Playlist</button>
+                <div id="importStatus"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentPlaylist = null;
+        let bandwidthMonitorInterval = null;
+        
+        // Load stats on page load
+        loadStats();
+        loadPlaylists();
+        loadUsers();
+        startBandwidthMonitoring();
+        
+        function switchTab(tabName, event) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            
+            // Highlight tab button if event provided
+            if (event && event.target) {
+                event.target.classList.add('active');
+            } else {
+                // Find and activate the corresponding tab button
+                const tabButton = document.querySelector(`[onclick*="switchTab('${tabName}')"]`);
+                if (tabButton) {
+                    tabButton.classList.add('active');
+                }
+            }
+            
+            // Stop stream monitoring when leaving channels tab
+            if (tabName !== 'channels') {
+                stopStreamMonitoring();
+            }
+            
+            // Load data for the tab
+            if (tabName === 'playlists') {
+                loadPlaylists();
+            } else if (tabName === 'relays') {
+                loadRelays();
+            } else if (tabName === 'channels') {
+                loadAllChannels();
+            }
+        }
+        
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/stats');
+                const stats = await response.json();
+                
+                document.getElementById('totalPlaylists').textContent = stats.total_playlists;
+                document.getElementById('totalChannels').textContent = stats.total_channels;
+                document.getElementById('activeChannels').textContent = stats.active_channels;
+                document.getElementById('totalRelays').textContent = stats.total_relays;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        function startBandwidthMonitoring() {
+            if (bandwidthMonitorInterval) {
+                clearInterval(bandwidthMonitorInterval);
+            }
+            updateBandwidthStats();
+            bandwidthMonitorInterval = setInterval(updateBandwidthStats, 3000);
+        }
+        
+        async function updateBandwidthStats() {
+            try {
+                const response = await fetch('/api/streams/status');
+                const data = await response.json();
+                
+                let totalDownloadMbps = 0;
+                let totalUploadMbps = 0;
+                let totalDownloadMB = 0;
+                let totalUploadMB = 0;
+                let activeStreams = 0;
+                
+                if (data.streams && data.streams.length > 0) {
+                    data.streams.forEach(stream => {
+                        totalDownloadMbps += stream.download_mbps || 0;
+                        totalUploadMbps += stream.upload_mbps || 0;
+                        totalDownloadMB += (stream.bytes_read || 0) / 1024 / 1024;
+                        totalUploadMB += (stream.bytes_written || 0) / 1024 / 1024;
+                        if (stream.clients > 0) activeStreams++;
+                    });
+                }
+                
+                document.getElementById('downloadSpeed').textContent = totalDownloadMbps.toFixed(2) + ' Mbps';
+                document.getElementById('uploadSpeed').textContent = totalUploadMbps.toFixed(2) + ' Mbps';
+                document.getElementById('downloadTotal').textContent = 'Total: ' + totalDownloadMB.toFixed(2) + ' MB';
+                document.getElementById('uploadTotal').textContent = 'Total: ' + totalUploadMB.toFixed(2) + ' MB';
+                
+                if (activeStreams > 0) {
+                    document.getElementById('activeStreamsInfo').textContent = 
+                        `${activeStreams} active stream${activeStreams > 1 ? 's' : ''}`;
+                } else {
+                    document.getElementById('activeStreamsInfo').textContent = 'No active streams';
+                }
+            } catch (error) {
+                console.error('Error updating bandwidth stats:', error);
+            }
+        }
+        
+        async function loadPlaylists() {
+            try {
+                const response = await fetch('/api/playlists');
+                const playlists = await response.json();
+                
+                const container = document.getElementById('playlistsList');
+                
+                if (!playlists || playlists.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><h3>Belum ada playlist</h3><p>Silakan import playlist M3U</p></div>';
+                    return;
+                }
+                
+                let html = '';
+                
+                playlists.forEach(playlist => {
+                    const exportUrl = `${window.location.origin}/api/playlists/${playlist.id}/export`;
+                    
+                    html += `
+                        <div style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <div>
+                                    <h3 style="margin: 0; color: #667eea;">📺 ${playlist.name}</h3>
+                                    <p style="margin: 5px 0; color: #666; font-size: 0.9em;">
+                                        <span class="badge badge-success">${playlist.type}</span>
+                                        • Dibuat: ${new Date(playlist.created_at).toLocaleDateString('id-ID')}
+                                    </p>
+                                </div>
+                                <div style="display: flex; gap: 10px;">
+                                    <button class="btn btn-primary btn-sm" onclick="viewChannels(${playlist.id})">Lihat Channels</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deletePlaylist(${playlist.id})">Hapus</button>
+                                </div>
+                            </div>
+                            
+                            <div class="url-box">
+                                <label>📥 URL untuk Import di IPTV Player:</label>
+                                <div class="url-display">
+                                    <input type="text" value="${exportUrl}" readonly id="url-${playlist.id}">
+                                    <button class="btn-copy" onclick="copyUrl('url-${playlist.id}', this)">📋 Copy</button>
+                                </div>
+                                <div class="url-info">
+                                    💡 Copy URL ini dan paste di aplikasi IPTV player Anda (VLC, IPTV Smarters, dll)
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading playlists:', error);
+            }
+        }
+        
+        let allChannels = [];
+        let currentCategory = '';
+        let searchTimeout = null;
+        
+        function debounceSearch() {
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+            searchTimeout = setTimeout(() => {
+                searchChannels();
+            }, 300);
+        }
+        
+        async function viewChannels(playlistId) {
+            currentPlaylist = playlistId;
+            switchTab('channels');
+            
+            try {
+                const response = await fetch(`/api/playlists/${playlistId}/channels`);
+                allChannels = await response.json();
+                
+                // Populate category filter
+                populateCategoryFilter(allChannels);
+                
+                displayChannels(allChannels);
+            } catch (error) {
+                console.error('Error loading channels:', error);
+            }
+        }
+        
+        function populateCategoryFilter(channels) {
+            const categories = [...new Set(channels.map(ch => ch.group || 'Uncategorized'))].sort();
+            const select = document.getElementById('categoryFilter');
+            
+            select.innerHTML = '<option value="">📂 Semua Kategori</option>';
+            categories.forEach(cat => {
+                select.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+        }
+        
+        function filterByCategory() {
+            const select = document.getElementById('categoryFilter');
+            const deleteBtn = document.getElementById('deleteCategoryBtn');
+            
+            if (!select || !deleteBtn) return;
+            
+            currentCategory = select.value;
+            
+            // Enable/disable delete button based on category selection
+            if (currentCategory) {
+                deleteBtn.disabled = false;
+            } else {
+                deleteBtn.disabled = true;
+            }
+            
+            // Check if allChannels is available
+            if (!allChannels || allChannels.length === 0) {
+                return;
+            }
+            
+            let filtered = allChannels;
+            if (currentCategory) {
+                filtered = allChannels.filter(ch => (ch.group || 'Uncategorized') === currentCategory);
+            }
+            
+            displayChannels(filtered);
+        }
+        
+        async function deleteCategoryBatch() {
+            if (!currentCategory) {
+                alert('Pilih kategori terlebih dahulu');
+                return;
+            }
+            
+            if (!allChannels || allChannels.length === 0) {
+                alert('Tidak ada data channel. Silakan pilih playlist terlebih dahulu.');
+                return;
+            }
+            
+            const channelsInCategory = allChannels.filter(ch => (ch.group || 'Uncategorized') === currentCategory);
+            const count = channelsInCategory.length;
+            
+            if (count === 0) {
+                alert('Tidak ada channel dalam kategori ini.');
+                return;
+            }
+            
+            if (!confirm(`Yakin ingin menghapus ${count} channel dalam kategori "${currentCategory}"?\n\nPeringatan: Tindakan ini tidak dapat dibatalkan!`)) {
+                return;
+            }
+            
+            // Show progress
+            const deleteBtn = document.getElementById('deleteCategoryBtn');
+            const originalText = deleteBtn.innerHTML;
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = '⏳ Menghapus...';
+            
+            try {
+                // Use batch delete endpoint for better performance
+                const response = await fetch('/api/channels/batch-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        category: currentCategory,
+                        playlist_id: currentPlaylist
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`Berhasil menghapus ${result.deleted} channel dari kategori "${currentCategory}"!`);
+                    
+                    // Reset filter and category
+                    const categorySelect = document.getElementById('categoryFilter');
+                    if (categorySelect) {
+                        categorySelect.value = '';
+                    }
+                    currentCategory = '';
+                    
+                    // Clear search
+                    const searchInput = document.getElementById('channelSearch');
+                    if (searchInput) {
+                        searchInput.value = '';
+                    }
+                    
+                    // Reset button
+                    deleteBtn.disabled = true;
+                    deleteBtn.innerHTML = originalText;
+                    
+                    // Refresh data
+                    loadStats();
+                    if (currentPlaylist) {
+                        await viewChannels(currentPlaylist);
+                    }
+                } else {
+                    alert('Gagal menghapus kategori: ' + (result.message || 'Unknown error'));
+                    deleteBtn.disabled = false;
+                    deleteBtn.innerHTML = originalText;
+                }
+            } catch (error) {
+                console.error('Error deleting category:', error);
+                alert('Gagal menghapus kategori: ' + error.message);
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = originalText;
+            }
+        }
+        
+        async function loadAllChannels() {
+            // For now, show empty state or all channels
+            document.getElementById('channelsList').innerHTML = '<div class="empty-state"><h3>Pilih playlist untuk melihat channels</h3></div>';
+        }
+        
+        function displayChannels(channels) {
+            const container = document.getElementById('channelsList');
+            
+            if (!channels || channels.length === 0) {
+                container.innerHTML = '<div class="empty-state"><h3>Tidak ada channels</h3></div>';
+                return;
+            }
+            
+            let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">';
+            
+            channels.forEach(channel => {
+                const statusBadge = channel.active ? `<span class="badge badge-secondary" id="status-${channel.id}">⏸️ Stopped</span>` : '<span class="badge badge-danger">🔴 Disabled</span>';
+                const logoImg = channel.logo ? `<img src="${channel.logo}" style="width: 60px; height: 60px; object-fit: contain; border-radius: 8px;">` : '<div style="width: 60px; height: 60px; background: #e0e0e0; border-radius: 8px; display: flex; align-items: center; justify-content: center;">📺</div>';
+                const proxyUrl = `${window.location.origin}/api/proxy/channel/${channel.id}`;
+                const isHLS = channel.url && (channel.url.endsWith('.m3u8') || channel.url.endsWith('.m3u'));
+                
+                html += `
+                    <div style="background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                            ${logoImg}
+                            <div style="flex: 1;">
+                                <h4 style="margin: 0; color: #333;">${channel.name}</h4>
+                                <p style="margin: 5px 0; color: #666; font-size: 0.85em;">${channel.group || 'Uncategorized'}</p>
+                                ${statusBadge}
+                            </div>
+                        </div>
+                        
+                        <div class="url-box" style="margin-bottom: 10px;">
+                            <label>📺 URL Stream:</label>
+                            <div class="url-display">
+                                <input type="text" value="${proxyUrl}" readonly id="channel-url-${channel.id}" style="font-size: 0.8em;">
+                                <button class="btn-copy" onclick="copyUrl('channel-url-${channel.id}', this)" style="padding: 8px 12px; font-size: 0.85em;">📋</button>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button class="btn btn-primary btn-sm" onclick="playChannel(${channel.id})" style="flex: 1; min-width: 80px;">▶️ Play</button>
+                            <button class="btn btn-sm" onclick="toggleChannel(${channel.id})" style="flex: 1; min-width: 80px;">${channel.active ? '🔴 Disable' : '🟢 Enable'}</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteChannel(${channel.id})" style="flex: 1; min-width: 80px;">🗑️ Hapus</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+            
+            // Start monitoring stream status for active channels
+            if (channels && channels.length > 0) {
+                startStreamMonitoring();
+            }
+        }
+        
+        let streamMonitorInterval = null;
+        
+        function startStreamMonitoring() {
+            // Clear existing interval
+            if (streamMonitorInterval) {
+                clearInterval(streamMonitorInterval);
+            }
+            
+            // Update immediately
+            updateStreamStatus();
+            
+            // Then update every 3 seconds
+            streamMonitorInterval = setInterval(updateStreamStatus, 3000);
+        }
+        
+        function stopStreamMonitoring() {
+            if (streamMonitorInterval) {
+                clearInterval(streamMonitorInterval);
+                streamMonitorInterval = null;
+            }
+        }
+        
+        async function updateStreamStatus() {
+            try {
+                const response = await fetch('/api/streams/status');
+                const data = await response.json();
+                
+                // Create a map of active streams
+                const activeStreams = {};
+                if (data.streams) {
+                    data.streams.forEach(stream => {
+                        activeStreams[stream.id] = stream;
+                    });
+                }
+                
+                // Update all channel status badges
+                allChannels.forEach(channel => {
+                    const badge = document.getElementById(`status-${channel.id}`);
+                    if (!badge || !channel.active) return;
+                    
+                    const streamId = `channel_${channel.id}`;
+                    const stream = activeStreams[streamId];
+                    
+                    if (stream && stream.clients > 0) {
+                        badge.className = 'badge badge-success';
+                        badge.innerHTML = `🟢 Streaming (${stream.clients} viewers)`;
+                    } else {
+                        badge.className = 'badge badge-secondary';
+                        badge.innerHTML = '⏸️ Stopped';
+                    }
+                });
+            } catch (error) {
+                console.error('Error updating stream status:', error);
+            }
+        }
+        
+        async function searchChannels() {
+            const searchInput = document.getElementById('channelSearch');
+            if (!searchInput) return;
+            
+            const query = searchInput.value;
+            
+            // If search is cleared, show all filtered channels
+            if (query.length === 0) {
+                if (allChannels && allChannels.length > 0) {
+                    filterByCategory();
+                }
+                return;
+            }
+            
+            if (query.length < 2) {
+                return;
+            }
+            
+            // Search within current filtered channels if available
+            if (allChannels && allChannels.length > 0) {
+                const filtered = allChannels.filter(ch => 
+                    ch.name.toLowerCase().includes(query.toLowerCase())
+                );
+                displayChannels(filtered);
+            } else {
+                // Fallback to API search
+                try {
+                    const response = await fetch(`/api/channels/search?q=${encodeURIComponent(query)}`);
+                    const channels = await response.json();
+                    displayChannels(channels);
+                } catch (error) {
+                    console.error('Error searching channels:', error);
+                }
+            }
+        }
+        
+        async function toggleChannel(channelId) {
+            try {
+                const response = await fetch(`/api/channels/${channelId}/toggle`, { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (currentPlaylist) {
+                        viewChannels(currentPlaylist);
+                    }
+                    loadStats();
+                }
+            } catch (error) {
+                console.error('Error toggling channel:', error);
+            }
+        }
+        
+        function playChannel(channelId) {
+            const url = `/api/proxy/channel/${channelId}`;
+            window.open(url, '_blank');
+        }
+        
+        async function deleteChannel(channelId) {
+            if (!confirm('Yakin ingin menghapus channel ini?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/channels/${channelId}`, { method: 'DELETE' });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Remove from local array
+                    allChannels = allChannels.filter(ch => ch.id !== channelId);
+                    
+                    // Re-apply current filter
+                    filterByCategory();
+                    
+                    // Reload stats
+                    loadStats();
+                    
+                    // Show success message
+                    console.log('Channel deleted successfully');
+                } else {
+                    alert('Gagal menghapus channel: ' + (result.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error deleting channel:', error);
+                alert('Gagal menghapus channel: ' + error.message);
+            }
+        }
+        
+        async function importPlaylist() {
+            const name = document.getElementById('playlistName').value;
+            const url = document.getElementById('playlistUrl').value;
+            
+            if (!name || !url) {
+                alert('Nama dan URL harus diisi!');
+                return;
+            }
+            
+            const statusDiv = document.getElementById('importStatus');
+            statusDiv.innerHTML = '<div class="alert alert-success">Importing...</div>';
+            
+            try {
+                const response = await fetch('/api/playlists/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, url })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    statusDiv.innerHTML = `<div class="alert alert-success">Berhasil import ${result.channels} channels!</div>`;
+                    document.getElementById('playlistName').value = '';
+                    document.getElementById('playlistUrl').value = '';
+                    loadStats();
+                    loadPlaylists();
+                } else {
+                    statusDiv.innerHTML = '<div class="alert alert-error">Import gagal!</div>';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = '<div class="alert alert-error">Error: ' + error.message + '</div>';
+            }
+        }
+        
+        async function deletePlaylist(id) {
+            if (!confirm('Yakin ingin menghapus playlist ini?')) {
+                return;
+            }
+            
+            try {
+                await fetch(`/api/playlists/${id}`, { method: 'DELETE' });
+                loadPlaylists();
+                loadStats();
+            } catch (error) {
+                console.error('Error deleting playlist:', error);
+            }
+        }
+        
+        function exportPlaylist(id) {
+            window.open(`/api/playlists/${id}/export`, '_blank');
+        }
+        
+        async function loadRelays() {
+            try {
+                const response = await fetch('/api/relays');
+                const relays = await response.json();
+                
+                const container = document.getElementById('relaysList');
+                
+                if (!relays || relays.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><h3>Belum ada relay</h3><p>Buat relay untuk failover streaming</p></div>';
+                    return;
+                }
+                
+                let html = '';
+                
+                relays.forEach(relay => {
+                    const sources = JSON.parse(relay.source_urls);
+                    const statusBadge = relay.active ? '<span class="badge badge-success">Active</span>' : '<span class="badge badge-danger">Inactive</span>';
+                    const streamUrl = `${window.location.origin}/stream/${relay.output_path}`;
+                    const hlsUrl = `${window.location.origin}/stream/${relay.output_path}/hls`;
+                    
+                    html += `
+                        <div style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <div>
+                                    <h3 style="margin: 0; color: #667eea;">📡 ${relay.name}</h3>
+                                    <p style="margin: 5px 0; color: #666; font-size: 0.9em;">
+                                        ${statusBadge}
+                                        • ${sources.length} source(s) dengan failover
+                                    </p>
+                                </div>
+                                <div style="display: flex; gap: 10px;">
+                                    <button class="btn btn-primary btn-sm" onclick="testRelay('${relay.output_path}')">▶️ Test</button>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteRelay(${relay.id})">🗑️ Hapus</button>
+                                </div>
+                            </div>
+                            
+                            <div class="url-box">
+                                <label>📺 URL Direct Stream (untuk semua format):</label>
+                                <div class="url-display">
+                                    <input type="text" value="${streamUrl}" readonly id="stream-url-${relay.id}">
+                                    <button class="btn-copy" onclick="copyUrl('stream-url-${relay.id}', this)">📋 Copy</button>
+                                </div>
+                            </div>
+                            
+                            <div class="url-box" style="margin-top: 10px;">
+                                <label>🎬 URL HLS Stream (jika source adalah HLS/m3u8):</label>
+                                <div class="url-display">
+                                    <input type="text" value="${hlsUrl}" readonly id="hls-url-${relay.id}">
+                                    <button class="btn-copy" onclick="copyUrl('hls-url-${relay.id}', this)">📋 Copy</button>
+                                </div>
+                                <div class="url-info">
+                                    ⚠️ Gunakan URL ini hanya jika source relay adalah format HLS (.m3u8)
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading relays:', error);
+            }
+        }
+        
+        function showCreateRelay() {
+            document.getElementById('createRelayForm').style.display = 'block';
+        }
+        
+        function hideCreateRelay() {
+            document.getElementById('createRelayForm').style.display = 'none';
+        }
+        
+        function addSourceUrl() {
+            const container = document.getElementById('sourceUrlsList');
+            const div = document.createElement('div');
+            div.className = 'url-item';
+            div.innerHTML = `
+                <input type="text" class="source-url" placeholder="http://source.com/stream.m3u8">
+                <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">Hapus</button>
+            `;
+            container.appendChild(div);
+        }
+        
+        async function createRelay() {
+            const name = document.getElementById('relayName').value;
+            const path = document.getElementById('relayPath').value;
+            const urlInputs = document.querySelectorAll('.source-url');
+            const sourceUrls = Array.from(urlInputs).map(input => input.value).filter(url => url);
+            
+            if (!name || !path || sourceUrls.length === 0) {
+                alert('Semua field harus diisi dan minimal 1 source URL!');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/relays', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name,
+                        output_path: path,
+                        source_urls: sourceUrls
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    hideCreateRelay();
+                    loadRelays();
+                    loadStats();
+                    document.getElementById('relayName').value = '';
+                    document.getElementById('relayPath').value = '';
+                    document.getElementById('sourceUrlsList').innerHTML = `
+                        <div class="url-item">
+                            <input type="text" class="source-url" placeholder="http://source1.com/stream.m3u8">
+                            <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">Hapus</button>
+                        </div>
+                    `;
+                } else {
+                    alert('Gagal membuat relay!');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function deleteRelay(id) {
+            if (!confirm('Yakin ingin menghapus relay ini?')) {
+                return;
+            }
+            
+            try {
+                await fetch(`/api/relays/${id}`, { method: 'DELETE' });
+                loadRelays();
+                loadStats();
+            } catch (error) {
+                console.error('Error deleting relay:', error);
+            }
+        }
+        
+        function testRelay(path) {
+            window.open(`/stream/${path}`, '_blank');
+        }
+        
+        function copyUrl(inputId, button) {
+            const input = document.getElementById(inputId);
+            
+            // Select and copy text
+            input.select();
+            input.setSelectionRange(0, 99999); // For mobile devices
+            
+            try {
+                // Modern way
+                navigator.clipboard.writeText(input.value).then(() => {
+                    // Success feedback
+                    const originalText = button.innerHTML;
+                    button.innerHTML = '✅ Copied!';
+                    button.classList.add('copied');
+                    
+                    setTimeout(() => {
+                        button.innerHTML = originalText;
+                        button.classList.remove('copied');
+                    }, 2000);
+                }).catch(() => {
+                    // Fallback
+                    document.execCommand('copy');
+                    showCopyFeedback(button);
+                });
+            } catch (err) {
+                // Older browser fallback
+                document.execCommand('copy');
+                showCopyFeedback(button);
+            }
+        }
+        
+        function showCopyFeedback(button) {
+            const originalText = button.innerHTML;
+            button.innerHTML = '✅ Copied!';
+            button.classList.add('copied');
+            
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.classList.remove('copied');
+            }, 2000);
+        }
+        
+        // ========== User Management ==========
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/users');
+                const users = await response.json();
+                
+                const container = document.getElementById('usersList');
+                if (users.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; color: #999; padding: 40px;">Belum ada user. Klik "Tambah User" untuk membuat user baru.</p>';
+                    return;
+                }
+                
+                let html = '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse;">';
+                html += '<thead><tr style="background: #667eea; color: white;">';
+                html += '<th style="padding: 12px; text-align: left;">Username</th>';
+                html += '<th style="padding: 12px; text-align: left;">Nama Lengkap</th>';
+                html += '<th style="padding: 12px; text-align: left;">Email</th>';
+                html += '<th style="padding: 12px; text-align: center;">Max Koneksi</th>';
+                html += '<th style="padding: 12px; text-align: center;">Status</th>';
+                html += '<th style="padding: 12px; text-align: center;">Sisa Hari</th>';
+                html += '<th style="padding: 12px; text-align: center;">Koneksi Aktif</th>';
+                html += '<th style="padding: 12px; text-align: center;">Aksi</th>';
+                html += '</tr></thead><tbody>';
+                
+                users.forEach(user => {
+                    const expiresAt = user.expires_at ? new Date(user.expires_at).toLocaleDateString('id-ID') : 'Unlimited';
+                    const daysRemaining = user.days_remaining || 0;
+                    const isExpired = user.is_expired || false;
+                    
+                    let statusBadge = '';
+                    if (!user.is_active) {
+                        statusBadge = '<span style="padding: 4px 12px; background: #dc3545; color: white; border-radius: 12px; font-size: 0.85em;">Nonaktif</span>';
+                    } else if (isExpired) {
+                        statusBadge = '<span style="padding: 4px 12px; background: #6c757d; color: white; border-radius: 12px; font-size: 0.85em;">Expired</span>';
+                    } else if (daysRemaining <= 7 && daysRemaining > 0) {
+                        statusBadge = '<span style="padding: 4px 12px; background: #ffc107; color: #000; border-radius: 12px; font-size: 0.85em;">⚠️ Akan Expired</span>';
+                    } else {
+                        statusBadge = '<span style="padding: 4px 12px; background: #28a745; color: white; border-radius: 12px; font-size: 0.85em;">✅ Aktif</span>';
+                    }
+                    
+                    let daysDisplay = '';
+                    if (expiresAt === 'Unlimited') {
+                        daysDisplay = '∞';
+                    } else if (isExpired) {
+                        daysDisplay = '<span style="color: #dc3545; font-weight: bold;">Expired</span>';
+                    } else {
+                        daysDisplay = `${daysRemaining} hari`;
+                    }
+                    
+                    html += `<tr style="border-bottom: 1px solid #e0e0e0;">`;
+                    html += `<td style="padding: 12px;"><strong>${user.username}</strong></td>`;
+                    html += `<td style="padding: 12px;">${user.full_name || '-'}</td>`;
+                    html += `<td style="padding: 12px;">${user.email || '-'}</td>`;
+                    html += `<td style="padding: 12px; text-align: center;">${user.max_connections}</td>`;
+                    html += `<td style="padding: 12px; text-align: center;">${statusBadge}</td>`;
+                    html += `<td style="padding: 12px; text-align: center;">${daysDisplay}</td>`;
+                    html += `<td style="padding: 12px; text-align: center;"><button class="btn btn-sm" onclick="showUserConnections(${user.id})">Lihat</button></td>`;
+                    html += `<td style="padding: 12px; text-align: center;">`;
+                    html += `<button class="btn btn-primary btn-sm" onclick="showEditUser(${user.id})" style="margin: 2px;">✏️ Edit</button>`;
+                    html += `<button class="btn btn-warning btn-sm" onclick="showResetPassword(${user.id})" style="margin: 2px;">🔑 Reset</button>`;
+                    html += `<button class="btn btn-danger btn-sm" onclick="deleteUser(${user.id})" style="margin: 2px;">🗑️ Hapus</button>`;
+                    html += `</td></tr>`;
+                });
+                
+                html += '</tbody></table></div>';
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+        
+        function showCreateUser() {
+            document.getElementById('createUserForm').style.display = 'block';
+        }
+        
+        function hideCreateUser() {
+            document.getElementById('createUserForm').style.display = 'none';
+            document.getElementById('newUsername').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('newFullName').value = '';
+            document.getElementById('newEmail').value = '';
+            document.getElementById('newMaxConnections').value = '1';
+            document.getElementById('newDurationDays').value = '';
+            document.getElementById('newNotes').value = '';
+        }
+        
+        async function createUser() {
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newPassword').value;
+            const fullName = document.getElementById('newFullName').value.trim();
+            const email = document.getElementById('newEmail').value.trim();
+            const maxConnections = parseInt(document.getElementById('newMaxConnections').value);
+            const durationDays = parseInt(document.getElementById('newDurationDays').value) || 0;
+            const notes = document.getElementById('newNotes').value.trim();
+            
+            if (!username || !password) {
+                alert('Username dan password wajib diisi!');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        username,
+                        password,
+                        full_name: fullName,
+                        email,
+                        max_connections: maxConnections,
+                        duration_days: durationDays,
+                        notes
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('User berhasil dibuat!');
+                    hideCreateUser();
+                    loadUsers();
+                } else {
+                    const error = await response.text();
+                    alert('Gagal membuat user: ' + error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function showEditUser(userId) {
+            // Load user data and show edit form
+            try {
+                const response = await fetch('/api/users');
+                const users = await response.json();
+                const user = users.find(u => u.id === userId);
+                
+                if (!user) {
+                    alert('User tidak ditemukan');
+                    return;
+                }
+                
+                const fullName = prompt('Nama Lengkap:', user.full_name || '');
+                if (fullName === null) return;
+                
+                const email = prompt('Email:', user.email || '');
+                if (email === null) return;
+                
+                const maxConnections = prompt('Max Koneksi:', user.max_connections);
+                if (maxConnections === null) return;
+                
+                const extendDays = prompt('Perpanjang (hari, 0 = tidak perpanjang):', '0');
+                if (extendDays === null) return;
+                
+                const isActive = confirm('User aktif?');
+                
+                const notes = prompt('Catatan:', user.notes || '');
+                if (notes === null) return;
+                
+                const updateResponse = await fetch(`/api/users/${userId}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        full_name: fullName,
+                        email: email,
+                        max_connections: parseInt(maxConnections),
+                        is_active: isActive,
+                        extend_days: parseInt(extendDays),
+                        notes: notes
+                    })
+                });
+                
+                if (updateResponse.ok) {
+                    alert('User berhasil diupdate!');
+                    loadUsers();
+                } else {
+                    const error = await updateResponse.text();
+                    alert('Gagal update user: ' + error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function showResetPassword(userId) {
+            const newPassword = prompt('Masukkan password baru:');
+            if (!newPassword) return;
+            
+            try {
+                const response = await fetch(`/api/users/${userId}/reset-password`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ new_password: newPassword })
+                });
+                
+                if (response.ok) {
+                    alert('Password berhasil direset!');
+                } else {
+                    const error = await response.text();
+                    alert('Gagal reset password: ' + error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function deleteUser(userId) {
+            if (!confirm('Yakin ingin menghapus user ini? Semua data terkait akan dihapus.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/users/${userId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('User berhasil dihapus!');
+                    loadUsers();
+                } else {
+                    const error = await response.text();
+                    alert('Gagal menghapus user: ' + error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function showUserConnections(userId) {
+            try {
+                const response = await fetch(`/api/users/${userId}/connections`);
+                const connections = await response.json();
+                
+                if (connections.length === 0) {
+                    alert('User tidak memiliki koneksi aktif saat ini.');
+                    return;
+                }
+                
+                let message = 'Koneksi Aktif:\n\n';
+                connections.forEach((conn, idx) => {
+                    message += `${idx + 1}. ${conn.channel_name || 'Unknown'}\n`;
+                    message += `   IP: ${conn.ip_address}\n`;
+                    message += `   Durasi: ${conn.duration.toFixed(1)} menit\n\n`;
+                });
+                
+                alert(message);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

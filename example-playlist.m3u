@@ -1,0 +1,25 @@
+#EXTM3U
+
+#EXTINF:-1 tvg-id="1" tvg-logo="https://example.com/logo1.png" group-title="Sports",Sport TV 1
+http://example-stream.com/sport1/index.m3u8
+
+#EXTINF:-1 tvg-id="2" tvg-logo="https://example.com/logo2.png" group-title="Sports",Sport TV 2
+http://example-stream.com/sport2/index.m3u8
+
+#EXTINF:-1 tvg-id="3" tvg-logo="https://example.com/logo3.png" group-title="Movies",Movie Channel HD
+http://example-stream.com/movies/index.m3u8
+
+#EXTINF:-1 tvg-id="4" tvg-logo="https://example.com/logo4.png" group-title="News",News Channel
+http://example-stream.com/news/index.m3u8
+
+#EXTINF:-1 tvg-id="5" tvg-logo="https://example.com/logo5.png" group-title="Entertainment",Entertainment TV
+http://example-stream.com/entertainment/index.m3u8
+
+#EXTINF:-1 tvg-id="6" tvg-logo="https://example.com/logo6.png" group-title="Kids",Kids Channel
+http://example-stream.com/kids/index.m3u8
+
+#EXTINF:-1 tvg-id="7" tvg-logo="https://example.com/logo7.png" group-title="Music",Music TV
+http://example-stream.com/music/index.m3u8
+
+#EXTINF:-1 tvg-id="8" tvg-logo="https://example.com/logo8.png" group-title="Documentary",Nat Geo HD
+http://example-stream.com/natgeo/index.m3u8
