@@ -1,0 +1,22 @@
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="800" height="600" fill="#1a1a1a"/>
+  
+  <!-- Red warning circle -->
+  <circle cx="400" cy="250" r="120" fill="#ff4444" opacity="0.2"/>
+  <circle cx="400" cy="250" r="100" fill="none" stroke="#ff4444" stroke-width="8"/>
+  
+  <!-- Warning icon -->
+  <text x="400" y="280" font-family="Arial" font-size="120" fill="#ff4444" text-anchor="middle">⚠️</text>
+  
+  <!-- Main text -->
+  <text x="400" y="430" font-family="Arial, sans-serif" font-size="42" font-weight="bold" fill="#ff4444" text-anchor="middle">SUBSCRIPTION EXPIRED</text>
+  
+  <!-- Subtitle -->
+  <text x="400" y="480" font-family="Arial, sans-serif" font-size="24" fill="#ffffff" text-anchor="middle" opacity="0.8">Langganan Anda Telah Berakhir</text>
+  
+  <!-- Contact info -->
+  <rect x="200" y="510" width="400" height="60" fill="#4CAF50" opacity="0.15" rx="5"/>
+  <rect x="200" y="510" width="400" height="60" fill="none" stroke="#4CAF50" stroke-width="2" rx="5"/>
+  <text x="400" y="545" font-family="Arial, sans-serif" font-size="20" fill="#4CAF50" text-anchor="middle">📞 Hubungi Admin Untuk Perpanjangan</text>
+</svg>

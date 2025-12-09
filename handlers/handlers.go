@@ -1,4 +1,4 @@
-package handlers
+																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																			package handlers
 
 import (
 	"crypto/md5"
@@ -11,14 +11,22 @@ import (
 	"iptv-panel/streaming"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 )
 
 // GetPlaylists returns all playlists
 func GetPlaylists(w http.ResponseWriter, r *http.Request) {
-	rows, err := database.DB.Query("SELECT id, name, url, type, created_at, updated_at FROM playlists")
+	rows, err := database.DB.Query(`
+		SELECT p.id, p.name, p.url, p.type, p.created_at, p.updated_at, 
+		       COUNT(c.id) as channel_count
+		FROM playlists p
+		LEFT JOIN channels c ON p.id = c.playlist_id
+		GROUP BY p.id, p.name, p.url, p.type, p.created_at, p.updated_at
+	`)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -28,7 +36,7 @@ func GetPlaylists(w http.ResponseWriter, r *http.Request) {
 	var playlists []models.Playlist
 	for rows.Next() {
 		var p models.Playlist
-		if err := rows.Scan(&p.ID, &p.Name, &p.URL, &p.Type, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.URL, &p.Type, &p.CreatedAt, &p.UpdatedAt, &p.ChannelCount); err != nil {
 			continue
 		}
 		playlists = append(playlists, p)
@@ -126,7 +134,15 @@ func DeletePlaylist(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	playlistID := vars["id"]
 
-	_, err := database.DB.Exec("DELETE FROM playlists WHERE id = ?", playlistID)
+	// Delete channels first
+	_, err := database.DB.Exec("DELETE FROM channels WHERE playlist_id = ?", playlistID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Then delete the playlist
+	_, err = database.DB.Exec("DELETE FROM playlists WHERE id = ?", playlistID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -209,8 +225,47 @@ func StreamRelay(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	path := vars["path"]
 
+	// Authenticate user
+	username := r.URL.Query().Get("username")
+	password := r.URL.Query().Get("password")
+	
+	if username == "" || password == "" {
+		http.Error(w, "Authentication required: username and password parameters missing", http.StatusUnauthorized)
+		return
+	}
+
+	// Verify user credentials and check if active
+	passwordHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
+	var userID int
+	var isActive bool
+	var expiresAt sql.NullTime
+	
+	err := database.DB.QueryRow(`
+		SELECT id, is_active, expires_at 
+		FROM users 
+		WHERE username = ? AND password = ?
+	`, username, passwordHash).Scan(&userID, &isActive, &expiresAt)
+	
+	if err == sql.ErrNoRows {
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	if !isActive {
+		ServeExpiredImage(w, r)
+		return
+	}
+	
+	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
+		ServeExpiredImage(w, r)
+		return
+	}
+
 	var sourceURLs string
-	err := database.DB.QueryRow("SELECT source_urls FROM relays WHERE output_path = ? AND active = 1", path).Scan(&sourceURLs)
+	err = database.DB.QueryRow("SELECT source_urls FROM relays WHERE output_path = ? AND active = 1", path).Scan(&sourceURLs)
 	if err == sql.ErrNoRows {
 		http.Error(w, "Relay not found", http.StatusNotFound)
 		return
@@ -411,13 +466,19 @@ func BatchDeleteChannels(w http.ResponseWriter, r *http.Request) {
 // SearchChannels searches channels by name
 func SearchChannels(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
+	
+	var rows *sql.Rows
+	var err error
+	
 	if query == "" {
-		http.Error(w, "Query parameter 'q' is required", http.StatusBadRequest)
-		return
+		// If no query, return all active channels
+		rows, err = database.DB.Query("SELECT id, playlist_id, name, url, logo, group_name, active, created_at FROM channels WHERE active = 1 ORDER BY name LIMIT 5000")
+	} else {
+		// If query provided, search by name
+		rows, err = database.DB.Query("SELECT id, playlist_id, name, url, logo, group_name, active, created_at FROM channels WHERE name LIKE ? AND active = 1 ORDER BY name LIMIT 5000",
+			"%"+query+"%")
 	}
-
-	rows, err := database.DB.Query("SELECT id, playlist_id, name, url, logo, group_name, active, created_at FROM channels WHERE name LIKE ? AND active = 1 LIMIT 50",
-		"%"+query+"%")
+	
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -462,6 +523,45 @@ func ProxyChannel(w http.ResponseWriter, r *http.Request) {
 	channelID, err := strconv.Atoi(channelIDStr)
 	if err != nil {
 		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		return
+	}
+
+	// Authenticate user
+	username := r.URL.Query().Get("username")
+	password := r.URL.Query().Get("password")
+	
+	if username == "" || password == "" {
+		http.Error(w, "Authentication required: username and password parameters missing", http.StatusUnauthorized)
+		return
+	}
+
+	// Verify user credentials and check if active
+	passwordHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
+	var userID int
+	var isActive bool
+	var expiresAt sql.NullTime
+	
+	err = database.DB.QueryRow(`
+		SELECT id, is_active, expires_at 
+		FROM users 
+		WHERE username = ? AND password = ?
+	`, username, passwordHash).Scan(&userID, &isActive, &expiresAt)
+	
+	if err == sql.ErrNoRows {
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	if !isActive {
+		ServeExpiredImage(w, r)
+		return
+	}
+	
+	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
+		ServeExpiredImage(w, r)
 		return
 	}
 
@@ -522,8 +622,47 @@ func StreamRelayHLS(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	path := vars["path"]
 
+	// Authenticate user
+	username := r.URL.Query().Get("username")
+	password := r.URL.Query().Get("password")
+	
+	if username == "" || password == "" {
+		http.Error(w, "Authentication required: username and password parameters missing", http.StatusUnauthorized)
+		return
+	}
+
+	// Verify user credentials and check if active
+	passwordHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
+	var userID int
+	var isActive bool
+	var expiresAt sql.NullTime
+	
+	err := database.DB.QueryRow(`
+		SELECT id, is_active, expires_at 
+		FROM users 
+		WHERE username = ? AND password = ?
+	`, username, passwordHash).Scan(&userID, &isActive, &expiresAt)
+	
+	if err == sql.ErrNoRows {
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	if !isActive {
+		ServeExpiredImage(w, r)
+		return
+	}
+	
+	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
+		ServeExpiredImage(w, r)
+		return
+	}
+
 	var sourceURLs string
-	err := database.DB.QueryRow("SELECT source_urls FROM relays WHERE output_path = ? AND active = 1", path).Scan(&sourceURLs)
+	err = database.DB.QueryRow("SELECT source_urls FROM relays WHERE output_path = ? AND active = 1", path).Scan(&sourceURLs)
 	if err == sql.ErrNoRows {
 		http.Error(w, "Relay not found", http.StatusNotFound)
 		return
@@ -681,6 +820,45 @@ func ProxyChannelHLS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Authenticate user
+	username := r.URL.Query().Get("username")
+	password := r.URL.Query().Get("password")
+	
+	if username == "" || password == "" {
+		http.Error(w, "Authentication required: username and password parameters missing", http.StatusUnauthorized)
+		return
+	}
+
+	// Verify user credentials and check if active
+	passwordHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
+	var userID int
+	var isActive bool
+	var expiresAt sql.NullTime
+	
+	err = database.DB.QueryRow(`
+		SELECT id, is_active, expires_at 
+		FROM users 
+		WHERE username = ? AND password = ?
+	`, username, passwordHash).Scan(&userID, &isActive, &expiresAt)
+	
+	if err == sql.ErrNoRows {
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	if !isActive {
+		ServeExpiredImage(w, r)
+		return
+	}
+	
+	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
+		ServeExpiredImage(w, r)
+		return
+	}
+
 	var url string
 	var active int
 	err = database.DB.QueryRow("SELECT url, active FROM channels WHERE id = ?", channelID).Scan(&url, &active)
@@ -731,4 +909,39 @@ func ProxyChannelHLS(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+// SaveGeneratedPlaylist saves a generated M3U playlist to static/playlists directory
+func SaveGeneratedPlaylist(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Filename string `json:"filename"`
+		Content  string `json:"content"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Create playlists directory if not exists
+	playlistDir := "./static/playlists"
+	if err := os.MkdirAll(playlistDir, 0755); err != nil {
+		http.Error(w, "Failed to create directory: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Save file
+	filePath := fmt.Sprintf("%s/%s", playlistDir, req.Filename)
+	if err := os.WriteFile(filePath, []byte(req.Content), 0644); err != nil {
+		http.Error(w, "Failed to save file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Return URL
+	url := fmt.Sprintf("/playlists/%s", req.Filename)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"url":     url,
+		"success": true,
+	})
 }

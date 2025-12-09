@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subscription Expired</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        
+        .container {
+            text-align: center;
+            padding: 20px;
+            max-width: 800px;
+        }
+        
+        .expired-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(255, 0, 0, 0.5);
+        }
+        
+        .message {
+            color: #ff4444;
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 20px;
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
+        }
+        
+        .sub-message {
+            color: #fff;
+            font-size: 16px;
+            margin-top: 10px;
+            opacity: 0.8;
+        }
+        
+        .contact {
+            color: #4CAF50;
+            font-size: 18px;
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(76, 175, 80, 0.1);
+            border-radius: 5px;
+            border: 2px solid #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="/expired.jpg" alt="Subscription Expired" class="expired-image" onerror="this.style.display='none'">
+        
+        <div class="message">
+            ⚠️ LANGGANAN ANDA TELAH BERAKHIR ⚠️
+        </div>
+        
+        <div class="sub-message">
+            Your subscription has expired. Please renew to continue watching.
+        </div>
+        
+        <div class="contact">
+            📞 Hubungi Admin untuk perpanjangan<br>
+            💳 Contact Admin to renew your subscription
+        </div>
+    </div>
+</body>
+</html>

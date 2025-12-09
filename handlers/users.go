@@ -268,3 +268,95 @@ func GetUserConnections(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(connections)
 }
+
+// SetUserExpired sets user expiration date (for testing)
+func SetUserExpired(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["id"]
+
+	var req struct {
+		Days int `json:"days"` // negative = expired, positive = extend
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	expiresAt := time.Now().AddDate(0, 0, req.Days)
+
+	_, err := database.DB.Exec("UPDATE users SET expires_at = ? WHERE id = ?", expiresAt, userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":    true,
+		"message":    "User expiration updated",
+		"expires_at": expiresAt,
+	})
+}
+
+// ExtendSubscription extends user subscription by adding days to current expiration
+func ExtendSubscription(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["id"]
+
+	var req struct {
+		Days int `json:"days"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Days <= 0 {
+		http.Error(w, "Days must be greater than 0", http.StatusBadRequest)
+		return
+	}
+
+	// Get current user data
+	var currentExpiresAt sql.NullTime
+	err := database.DB.QueryRow("SELECT expires_at FROM users WHERE id = ?", userID).Scan(&currentExpiresAt)
+	if err == sql.ErrNoRows {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Calculate new expiration date
+	var newExpiresAt time.Time
+	if currentExpiresAt.Valid && currentExpiresAt.Time.After(time.Now()) {
+		// If user has valid future expiration, extend from that date
+		newExpiresAt = currentExpiresAt.Time.AddDate(0, 0, req.Days)
+	} else {
+		// If user is expired or has no expiration, extend from now
+		newExpiresAt = time.Now().AddDate(0, 0, req.Days)
+	}
+
+	// Update database
+	_, err = database.DB.Exec("UPDATE users SET expires_at = ?, is_active = 1 WHERE id = ?", newExpiresAt, userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Calculate days remaining
+	daysRemaining := int(time.Until(newExpiresAt).Hours() / 24)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":        true,
+		"message":        "Subscription extended successfully",
+		"expires_at":     newExpiresAt,
+		"days_extended":  req.Days,
+		"days_remaining": daysRemaining,
+	})
+}
+
+

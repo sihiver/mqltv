@@ -1,0 +1,278 @@
+        // ========== User Management ==========
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/users');
+                const users = await response.json();
+                
+                const container = document.getElementById('usersList');
+                if (users.length === 0) {
+                    container.innerHTML = '<p style="text-align: center; color: #999; padding: 40px;">Belum ada user. Klik "Tambah User" untuk membuat user baru.</p>';
+                    return;
+                }
+                
+                let html = '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse;">';
+                html += '<thead><tr style="background: #667eea; color: white;">';
+                html += '<th style="padding: 12px; text-align: left;">Username</th>';
+                html += '<th style="padding: 12px; text-align: left;">Nama Lengkap</th>';
+                html += '<th style="padding: 12px; text-align: left;">Email</th>';
+                html += '<th style="padding: 12px; text-align: center;">Max Koneksi</th>';
+                html += '<th style="padding: 12px; text-align: center;">Status</th>';
+                html += '<th style="padding: 12px; text-align: center;">Sisa Hari</th>';
+                html += '<th style="padding: 12px; text-align: center;">Koneksi Aktif</th>';
+                html += '<th style="padding: 12px; text-align: center;">Aksi</th>';
+                html += '</tr></thead><tbody>';
+                
+                users.forEach(user => {
+                    const expiresAt = user.expires_at ? new Date(user.expires_at).toLocaleDateString('id-ID') : 'Unlimited';
+                    const daysRemaining = user.days_remaining || 0;
+                    const isExpired = user.is_expired || false;
+                    
+                    let statusBadge = '';
+                    if (!user.is_active) {
+                        statusBadge = '<span style="padding: 4px 12px; background: #dc3545; color: white; border-radius: 12px; font-size: 0.85em;">Nonaktif</span>';
+                    } else if (isExpired) {
+                        statusBadge = '<span style="padding: 4px 12px; background: #6c757d; color: white; border-radius: 12px; font-size: 0.85em;">Expired</span>';
+                    } else if (daysRemaining <= 7 && daysRemaining > 0) {
+                        statusBadge = '<span style="padding: 4px 12px; background: #ffc107; color: #000; border-radius: 12px; font-size: 0.85em;">⚠️ Akan Expired</span>';
+                    } else {
+                        statusBadge = '<span style="padding: 4px 12px; background: #28a745; color: white; border-radius: 12px; font-size: 0.85em;">✅ Aktif</span>';
+                    }
+                    
+                    let daysDisplay = '';
+                    if (expiresAt === 'Unlimited') {
+                        daysDisplay = '∞';
+                    } else if (isExpired) {
+                        daysDisplay = '<span style="color: #dc3545; font-weight: bold;">Expired</span>';
+                    } else {
+                        daysDisplay = `${daysRemaining} hari`;
+                    }
+                    
+                    html += `<tr style="border-bottom: 1px solid #e0e0e0;">`;
+                    html += `<td style="padding: 12px;"><strong>${user.username}</strong></td>`;
+                    html += `<td style="padding: 12px;">${user.full_name || '-'}</td>`;
+                    html += `<td style="padding: 12px;">${user.email || '-'}</td>`;
+                    html += `<td style="padding: 12px; text-align: center;">${user.max_connections}</td>`;
+                    html += `<td style="padding: 12px; text-align: center;">${statusBadge}</td>`;
+                    html += `<td style="padding: 12px; text-align: center;">${daysDisplay}</td>`;
+                    html += `<td style="padding: 12px; text-align: center;"><button class="btn btn-sm" onclick="showUserConnections(${user.id})">Lihat</button></td>`;
+                    html += `<td style="padding: 12px; text-align: center;">`;
+                    html += `<button class="btn btn-primary btn-sm" onclick="showEditUser(${user.id})" style="margin: 2px;">✏️ Edit</button>`;
+                    html += `<button class="btn btn-warning btn-sm" onclick="showResetPassword(${user.id})" style="margin: 2px;">🔑 Reset</button>`;
+                    html += `<button class="btn btn-danger btn-sm" onclick="deleteUser(${user.id})" style="margin: 2px;">🗑️ Hapus</button>`;
+                    html += `</td></tr>`;
+                });
+                
+                html += '</tbody></table></div>';
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+        
+        function showCreateUser() {
+            document.getElementById('createUserForm').style.display = 'block';
+        }
+        
+        function hideCreateUser() {
+            document.getElementById('createUserForm').style.display = 'none';
+            document.getElementById('newUsername').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('newFullName').value = '';
+            document.getElementById('newEmail').value = '';
+            document.getElementById('newMaxConnections').value = '1';
+            document.getElementById('newDurationDays').value = '';
+            document.getElementById('newNotes').value = '';
+        }
+        
+        async function createUser() {
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newPassword').value;
+            const fullName = document.getElementById('newFullName').value.trim();
+            const email = document.getElementById('newEmail').value.trim();
+            const maxConnections = parseInt(document.getElementById('newMaxConnections').value);
+            const durationDays = parseInt(document.getElementById('newDurationDays').value) || 0;
+            const notes = document.getElementById('newNotes').value.trim();
+            
+            if (!username || !password) {
+                alert('Username dan password wajib diisi!');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        username,
+                        password,
+                        full_name: fullName,
+                        email,
+                        max_connections: maxConnections,
+                        duration_days: durationDays,
+                        notes
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('User berhasil dibuat!');
+                    hideCreateUser();
+                    loadUsers();
+                } else {
+                    const error = await response.text();
+                    alert('Gagal membuat user: ' + error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function showEditUser(userId) {
+            // Load user data and show edit form
+            try {
+                const response = await fetch('/api/users');
+                const users = await response.json();
+                const user = users.find(u => u.id === userId);
+                
+                if (!user) {
+                    alert('User tidak ditemukan');
+                    return;
+                }
+                
+                const fullName = prompt('Nama Lengkap:', user.full_name || '');
+                if (fullName === null) return;
+                
+                const email = prompt('Email:', user.email || '');
+                if (email === null) return;
+                
+                const maxConnections = prompt('Max Koneksi:', user.max_connections);
+                if (maxConnections === null) return;
+                
+                const extendDays = prompt('Perpanjang (hari, 0 = tidak perpanjang):', '0');
+                if (extendDays === null) return;
+                
+                const isActive = confirm('User aktif?');
+                
+                const notes = prompt('Catatan:', user.notes || '');
+                if (notes === null) return;
+                
+                const updateResponse = await fetch(`/api/users/${userId}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        full_name: fullName,
+                        email: email,
+                        max_connections: parseInt(maxConnections),
+                        is_active: isActive,
+                        extend_days: parseInt(extendDays),
+                        notes: notes
+                    })
+                });
+                
+                if (updateResponse.ok) {
+                    alert('User berhasil diupdate!');
+                    loadUsers();
+                } else {
+                    const error = await updateResponse.text();
+                    alert('Gagal update user: ' + error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function showResetPassword(userId) {
+            const newPassword = prompt('Masukkan password baru:');
+            if (!newPassword) return;
+            
+            try {
+                const response = await fetch(`/api/users/${userId}/reset-password`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ new_password: newPassword })
+                });
+                
+                if (response.ok) {
+                    alert('Password berhasil direset!');
+                } else {
+                    const error = await response.text();
+                    alert('Gagal reset password: ' + error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function deleteUser(userId) {
+            if (!confirm('Yakin ingin menghapus user ini? Semua data terkait akan dihapus.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/users/${userId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    alert('User berhasil dihapus!');
+                    loadUsers();
+                } else {
+                    const error = await response.text();
+                    alert('Gagal menghapus user: ' + error);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function showUserConnections(userId) {
+            try {
+                const response = await fetch(`/api/users/${userId}/connections`);
+                const connections = await response.json();
+                
+                if (connections.length === 0) {
+                    alert('User tidak memiliki koneksi aktif saat ini.');
+                    return;
+                }
+                
+                let message = 'Koneksi Aktif:\n\n';
+                connections.forEach((conn, idx) => {
+                    message += `${idx + 1}. ${conn.channel_name || 'Unknown'}\n`;
+                    message += `   IP: ${conn.ip_address}\n`;
+                    message += `   Durasi: ${conn.duration.toFixed(1)} menit\n\n`;
+                });
+                
+                alert(message);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        // ========== Generate Playlist ==========
+        let selectedChannels = new Set();
+        let allPlaylistChannels = [];
+        
+        async function loadPlaylistUsers() {
+            try {
+                const response = await fetch('/api/users');
+                const users = await response.json();
+                
+                const select = document.getElementById('playlistUser');
+                select.innerHTML = '<option value="">-- Pilih User --</option>';
+                
+                users.forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = user.id;
+                    option.textContent = `${user.username} - ${user.full_name}`;
+                    option.dataset.username = user.username;
+                    option.dataset.password = 'encrypted'; // We'll need to handle this
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+        
+        async function loadUserInfo() {
+            const select = document.getElementById('playlistUser');
+            const userId = select.value;
+            

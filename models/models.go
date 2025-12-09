@@ -5,12 +5,13 @@ import (
 )
 
 type Playlist struct {
-	ID        int       `json:"id"`
-	Name      string    `json:"name"`
-	URL       string    `json:"url"`
-	Type      string    `json:"type"` // "m3u" or "relay"
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID           int       `json:"id"`
+	Name         string    `json:"name"`
+	URL          string    `json:"url"`
+	Type         string    `json:"type"` // "m3u" or "relay"
+	ChannelCount int       `json:"channel_count"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type Channel struct {

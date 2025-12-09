@@ -64,12 +64,20 @@ func main() {
 	api.HandleFunc("/users/{id}", handlers.DeleteUser).Methods("DELETE")
 	api.HandleFunc("/users/{id}/reset-password", handlers.ResetUserPassword).Methods("POST")
 	api.HandleFunc("/users/{id}/connections", handlers.GetUserConnections).Methods("GET")
+	api.HandleFunc("/users/{id}/set-expired", handlers.SetUserExpired).Methods("POST")
+	api.HandleFunc("/users/{id}/extend", handlers.ExtendSubscription).Methods("POST")
+	
+	// Generated Playlists
+	api.HandleFunc("/generated-playlists", handlers.SaveGeneratedPlaylist).Methods("POST")
 	
 	// Stream relay endpoints (on-demand, multi-client)
 	r.HandleFunc("/stream/{path}", handlers.StreamRelay).Methods("GET")
 	r.HandleFunc("/stream/{path}/hls", handlers.StreamRelayHLS).Methods("GET")
 	r.HandleFunc("/stream/{path}/hls/{segment}", handlers.StreamRelayHLSSegment).Methods("GET")
 
+	// Serve generated playlists
+	r.PathPrefix("/generated_playlists/").Handler(http.StripPrefix("/generated_playlists/", http.FileServer(http.Dir("./generated_playlists"))))
+	
 	// Serve static files
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./static")))
 

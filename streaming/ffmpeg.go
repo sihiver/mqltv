@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 )
@@ -199,9 +200,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-c", "copy",                  // Copy codec (no transcoding)
 		"-f", "mpegts",                // Output format MPEG-TS
 		"-avoid_negative_ts", "make_zero", // Avoid timestamp issues
-		"-muxdelay", "0",              // No mux delay
-		"-muxpreload", "0",            // No preload
-		"-max_muxing_queue_size", "1024", // Limit muxing queue
+		"-max_muxing_queue_size", "9999", // Large muxing queue for stability
 		"pipe:1",                      // Output to stdout
 	}
 
@@ -221,7 +220,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			"-c", "copy",
 			"-f", "mpegts",
 			"-avoid_negative_ts", "make_zero",
-			"-max_muxing_queue_size", "1024",
+			"-max_muxing_queue_size", "9999",
 			"pipe:1",
 		}
 	}
@@ -247,14 +246,18 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 
 	log.Printf("✅ FFmpeg started for source: %s", sourceURL)
 
-	// Read FFmpeg stderr in background (for logging)
+	// Read FFmpeg stderr in background (for logging errors)
 	go func() {
-		buf := make([]byte, 1024)
+		buf := make([]byte, 4096)
 		for {
 			n, err := stderr.Read(buf)
 			if n > 0 {
-				// Log FFmpeg errors/warnings if needed
-				// log.Printf("FFmpeg: %s", string(buf[:n]))
+				errMsg := string(buf[:n])
+				// Log FFmpeg errors/warnings
+				if strings.Contains(errMsg, "error") || strings.Contains(errMsg, "Error") || 
+				   strings.Contains(errMsg, "Invalid") || strings.Contains(errMsg, "failed") {
+					log.Printf("🔴 FFmpeg error for %s: %s", s.ID, errMsg)
+				}
 			}
 			if err != nil {
 				break
