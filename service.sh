@@ -5,10 +5,43 @@
 SERVICE_NAME="iptv-panel"
 SERVICE_FILE="${SERVICE_NAME}.service"
 SYSTEMD_PATH="/etc/systemd/system/${SERVICE_FILE}"
+CURRENT_USER=$(whoami)
+CURRENT_DIR=$(pwd)
 
 case "$1" in
     install)
         echo "📦 Installing IPTV Panel service..."
+        echo "👤 User: $CURRENT_USER"
+        echo "📁 Directory: $CURRENT_DIR"
+        
+        # Generate dynamic service file
+        cat > "$SERVICE_FILE" << EOF
+[Unit]
+Description=IPTV Panel Service
+After=network.target
+
+[Service]
+Type=simple
+User=$CURRENT_USER
+WorkingDirectory=$CURRENT_DIR
+ExecStart=$CURRENT_DIR/iptv-panel
+Restart=always
+RestartSec=5
+StandardOutput=append:$CURRENT_DIR/server.log
+StandardError=append:$CURRENT_DIR/server.log
+
+# Environment variables
+Environment="DB_PATH=$CURRENT_DIR/iptv.db"
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        
+        echo "✅ Service file generated"
         
         # Copy service file to systemd directory
         sudo cp "$SERVICE_FILE" "$SYSTEMD_PATH"
