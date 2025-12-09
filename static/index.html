@@ -11,8 +11,9 @@
         <header style="position: relative;">
             <h1>🎬 IPTV Panel</h1>
             <p>Kelola Playlist & Stream Relay IPTV Anda</p>
-            <div style="position: absolute; top: 20px; right: 20px;">
-                <span id="adminUsername" style="margin-right: 10px; color: #666;"></span>
+            <div style="position: absolute; top: 20px; right: 20px; display: flex; align-items: center; gap: 10px;">
+                <span id="adminUsername" style="color: #666;"></span>
+                <button onclick="showChangePasswordModal()" class="btn" style="padding: 8px 16px; background: #2196F3;">🔑 Ganti Password</button>
                 <button onclick="logout()" class="btn" style="padding: 8px 16px;">🚪 Logout</button>
             </div>
         </header>
@@ -246,6 +247,37 @@
         </div>
     </div>
 
+    <!-- Change Password Modal -->
+    <div id="changePasswordModal" class="modal">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>🔑 Ganti Password Admin</h3>
+                <span class="close" onclick="closeChangePasswordModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="changePasswordForm" onsubmit="changePassword(event)">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Password Lama:</label>
+                        <input type="password" id="adminOldPassword" required autocomplete="current-password" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Password Baru:</label>
+                        <input type="password" id="adminNewPassword" required autocomplete="new-password" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                        <small style="color: #666; display: block; margin-top: 5px;">Minimal 6 karakter</small>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 5px; font-weight: 500;">Konfirmasi Password Baru:</label>
+                        <input type="password" id="adminConfirmPassword" required autocomplete="new-password" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" onclick="closeChangePasswordModal()" class="btn" style="background: #666;">Batal</button>
+                        <button type="submit" class="btn" style="background: #2196F3;">💾 Simpan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Load JavaScript Modules -->
     <script src="/app.js?v=1733267131"></script>
     <script src="/playlist.js?v=1733267131"></script>
@@ -287,6 +319,84 @@
         
         // Load username on page load
         loadUsername();
+        
+        // Change Password Modal Functions
+        function showChangePasswordModal() {
+            document.getElementById('changePasswordModal').style.display = 'flex';
+            document.getElementById('changePasswordForm').reset();
+        }
+        
+        function closeChangePasswordModal() {
+            document.getElementById('changePasswordModal').style.display = 'none';
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('changePasswordModal');
+            if (event.target === modal) {
+                closeChangePasswordModal();
+            }
+        }
+        
+        // Change Password Function
+        async function changePassword(event) {
+            event.preventDefault();
+            
+            // Get values from admin password modal (NOT user management form)
+            const oldPassword = document.getElementById('adminOldPassword').value;
+            const newPassword = document.getElementById('adminNewPassword').value;
+            const confirmPassword = document.getElementById('adminConfirmPassword').value;
+            
+            // Validate old password not empty
+            if (!oldPassword || oldPassword.length === 0) {
+                alert('❌ Password lama tidak boleh kosong!');
+                return;
+            }
+            
+            // Validate new password not empty
+            if (!newPassword || newPassword.length === 0) {
+                alert('❌ Password baru tidak boleh kosong!');
+                return;
+            }
+            
+            // Validate password length
+            if (newPassword.length < 6) {
+                alert('❌ Password baru minimal 6 karakter! (Saat ini: ' + newPassword.length + ' karakter)');
+                return;
+            }
+            
+            // Validate passwords match
+            if (newPassword !== confirmPassword) {
+                alert('❌ Password baru dan konfirmasi password tidak cocok!');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/auth/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        old_password: oldPassword,
+                        new_password: newPassword
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert('✅ Password berhasil diubah!');
+                    closeChangePasswordModal();
+                    document.getElementById('changePasswordForm').reset();
+                } else {
+                    alert('❌ ' + (result.error || 'Gagal mengubah password. Periksa password lama Anda.'));
+                }
+            } catch (error) {
+                console.error('Change password error:', error);
+                alert('❌ Terjadi kesalahan saat mengubah password.');
+            }
+        }
     </script>
 </body>
 </html>

@@ -103,6 +103,76 @@ func CheckAuth(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ChangePassword handles admin password change
+func ChangePassword(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "admin-session")
+	adminID, ok := session.Values["admin_id"].(int)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Validate new password length
+	if len(req.NewPassword) < 6 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": "Password baru minimal 6 karakter",
+		})
+		return
+	}
+
+	// Hash old password and verify
+	hashedOldPassword := fmt.Sprintf("%x", md5.Sum([]byte(req.OldPassword)))
+	
+	var currentPassword string
+	err := database.DB.QueryRow(
+		"SELECT password FROM admins WHERE id = ?",
+		adminID,
+	).Scan(&currentPassword)
+
+	if err != nil {
+		http.Error(w, "Admin not found", http.StatusNotFound)
+		return
+	}
+
+	if currentPassword != hashedOldPassword {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error": "Password lama tidak sesuai",
+		})
+		return
+	}
+
+	// Hash new password and update
+	hashedNewPassword := fmt.Sprintf("%x", md5.Sum([]byte(req.NewPassword)))
+	
+	_, err = database.DB.Exec(
+		"UPDATE admins SET password = ? WHERE id = ?",
+		hashedNewPassword, adminID,
+	)
+
+	if err != nil {
+		http.Error(w, "Failed to update password", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Password berhasil diubah",
+	})
+}
+
 // AuthMiddleware protects routes
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

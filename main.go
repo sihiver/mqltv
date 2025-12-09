@@ -43,6 +43,9 @@ func main() {
 		return handlers.AuthMiddleware(next)
 	})
 	
+	// Auth (protected)
+	api.HandleFunc("/auth/change-password", handlers.ChangePassword).Methods("POST")
+	
 	// Stats
 	api.HandleFunc("/stats", handlers.GetStats).Methods("GET")
 	
