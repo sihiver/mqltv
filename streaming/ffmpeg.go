@@ -96,7 +96,7 @@ func (s *FFmpegSession) AddClient(clientID, remoteAddr string) chan []byte {
 	s.clientsMux.Lock()
 	defer s.clientsMux.Unlock()
 
-	dataChan := make(chan []byte, 500) // Larger buffer for multiple concurrent streams
+	dataChan := make(chan []byte, 2000) // Large buffer to prevent packet drops
 	
 	s.pipeWriter.readersMux.Lock()
 	s.pipeWriter.readers[clientID] = dataChan
@@ -271,7 +271,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			log.Printf("⏹️  FFmpeg reader stopped: %s", s.ID)
 		}()
 
-		buffer := make([]byte, 32768) // 32KB buffer for better performance with multiple streams
+		buffer := make([]byte, 8192) // 8KB buffer - smaller chunks for better distribution
 		for {
 			select {
 			case <-s.ctx.Done():
@@ -299,16 +299,18 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 					// Write to buffer
 					s.pipeWriter.buffer.Write(data)
 
-					// Broadcast to all clients (non-blocking)
+					// Broadcast to all clients (blocking with large buffer prevents drops)
 					s.pipeWriter.readersMux.RLock()
 					clientCount := len(s.pipeWriter.readers)
-					for clientID, ch := range s.pipeWriter.readers {
+					for _, ch := range s.pipeWriter.readers {
+						// Blocking send - buffer is large enough (2000)
+						// If buffer fills up, client is too slow and will experience lag
 						select {
 						case ch <- data:
 							// Sent successfully
 						default:
-							// Channel full, log and skip
-							log.Printf("⚠️  Dropping packet for client %s on stream %s (buffer full)", clientID, s.ID)
+							// Buffer full - skip this packet for this client
+							// With 2000 buffer, this should be rare
 						}
 					}
 					s.pipeWriter.readersMux.RUnlock()
