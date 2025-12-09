@@ -338,7 +338,7 @@ async function saveAndCopyPlaylistURL() {
         
         if (result.success) {
             const fullUrl = `http://${window.location.host}${result.url}`;
-            document.getElementById('playlistUrl').value = fullUrl;
+            document.getElementById('generatedPlaylistUrl').value = fullUrl;
             document.getElementById('playlistUrlBox').style.display = 'block';
             
             alert(`✅ Playlist saved!\n\nFile: ${filename}\nChannels: ${selectedChannelsList.length}\n\nURL sudah tersedia di bawah.`);
@@ -352,7 +352,7 @@ async function saveAndCopyPlaylistURL() {
 }
 
 function copyToClipboard() {
-    const urlInput = document.getElementById('playlistUrl');
+    const urlInput = document.getElementById('generatedPlaylistUrl');
     urlInput.select();
     urlInput.setSelectionRange(0, 99999); // For mobile devices
     
