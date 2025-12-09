@@ -1,5 +1,78 @@
 // User Management Functions
 
+// Global variable to track current popup
+let currentUserPopup = null;
+
+// Show user actions popup
+function showUserActions(userId, username, event) {
+    event.stopPropagation();
+    
+    // Close any existing popup
+    if (currentUserPopup) {
+        currentUserPopup.remove();
+    }
+    
+    // Create popup
+    const popup = document.createElement('div');
+    popup.className = 'user-actions-popup';
+    popup.innerHTML = `
+        <div class="popup-header">
+            <strong>👤 ${username}</strong>
+            <button class="close-btn" onclick="closeUserActionsPopup()">✖</button>
+        </div>
+        <div class="popup-content">
+            <button class="popup-action-btn" onclick="copyUserPlaylistURL('${username}');">
+                📋 Copy Playlist URL
+            </button>
+            <button class="popup-action-btn" onclick="viewUserChannels('${username}'); closeUserActionsPopup();">
+                📺 Lihat Channels
+            </button>
+            <button class="popup-action-btn btn-success" onclick="extendSubscription(${userId}, '${username}'); closeUserActionsPopup();">
+                ➕ Perpanjang Subscription
+            </button>
+            <button class="popup-action-btn" onclick="editUser(${userId}); closeUserActionsPopup();">
+                ✏️ Edit User
+            </button>
+            <button class="popup-action-btn" onclick="resetPassword(${userId}); closeUserActionsPopup();">
+                🔑 Reset Password
+            </button>
+            <button class="popup-action-btn btn-warning" onclick="setExpired(${userId}, '${username}'); closeUserActionsPopup();">
+                ⏰ Test Expired
+            </button>
+            <button class="popup-action-btn btn-danger" onclick="deleteUser(${userId}); closeUserActionsPopup();">
+                🗑️ Hapus User
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(popup);
+    currentUserPopup = popup;
+    
+    // Position popup near the button
+    const rect = event.target.getBoundingClientRect();
+    popup.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+    popup.style.left = (rect.left + window.scrollX - 150) + 'px';
+    
+    // Close popup when clicking outside
+    setTimeout(() => {
+        document.addEventListener('click', closeUserActionsPopupOutside);
+    }, 100);
+}
+
+function closeUserActionsPopup() {
+    if (currentUserPopup) {
+        currentUserPopup.remove();
+        currentUserPopup = null;
+        document.removeEventListener('click', closeUserActionsPopupOutside);
+    }
+}
+
+function closeUserActionsPopupOutside(event) {
+    if (currentUserPopup && !currentUserPopup.contains(event.target)) {
+        closeUserActionsPopup();
+    }
+}
+
 async function loadUsers() {
     try {
         const response = await fetch('/api/users');
@@ -41,12 +114,7 @@ async function loadUsers() {
                     <td style="text-align: center;">${statusBadge}</td>
                     <td style="text-align: center;">${daysDisplay}</td>
                     <td style="text-align: center;">
-                        <button class="btn btn-sm" onclick="viewUserChannels('${user.username}')">📺 Channels</button>
-                        <button class="btn btn-success btn-sm" onclick="extendSubscription(${user.id}, '${user.username}')">➕ Perpanjang</button>
-                        <button class="btn btn-sm" onclick="editUser(${user.id})">Edit</button>
-                        <button class="btn btn-sm" onclick="resetPassword(${user.id})">Reset Pass</button>
-                        <button class="btn btn-warning btn-sm" onclick="setExpired(${user.id}, '${user.username}')">⏰ Test Expired</button>
-                        <button class="btn btn-danger btn-sm" onclick="deleteUser(${user.id})">Hapus</button>
+                        <button class="btn btn-sm btn-primary" onclick="showUserActions(${user.id}, '${user.username}', event)">⚙️ Actions</button>
                     </td>
                 </tr>
             `;
@@ -303,3 +371,36 @@ async function setExpired(userId, username) {
         alert('Error: ' + error.message);
     }
 }
+
+// Copy user playlist URL to clipboard
+async function copyUserPlaylistURL(username) {
+    const playlistURL = `${window.location.protocol}//${window.location.host}/mql/${username}.m3u`;
+    
+    try {
+        // Copy to clipboard directly
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(playlistURL);
+            
+            // Show success feedback
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '✅ URL Copied!';
+            btn.style.background = '#d4edda';
+            
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.style.background = '';
+                closeUserActionsPopup();
+            }, 1500);
+        } else {
+            // Fallback for older browsers
+            prompt('Copy Playlist URL:', playlistURL);
+            closeUserActionsPopup();
+        }
+    } catch (error) {
+        // Fallback if clipboard fails
+        prompt('Copy Playlist URL:', playlistURL);
+        closeUserActionsPopup();
+    }
+}
+

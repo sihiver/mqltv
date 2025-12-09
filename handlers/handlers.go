@@ -924,7 +924,7 @@ func SaveGeneratedPlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create playlists directory if not exists
-	playlistDir := "./static/playlists"
+	playlistDir := "./generated_playlists"
 	if err := os.MkdirAll(playlistDir, 0755); err != nil {
 		http.Error(w, "Failed to create directory: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -938,10 +938,31 @@ func SaveGeneratedPlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return URL
-	url := fmt.Sprintf("/playlists/%s", req.Filename)
+	url := fmt.Sprintf("/generated_playlists/%s", req.Filename)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"url":     url,
 		"success": true,
 	})
 }
+
+// ServeUserPlaylist serves user playlist with short URL: /mql/{user}.m3u
+func ServeUserPlaylist(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	username := vars["user"]
+	
+	// Build file path
+	filePath := fmt.Sprintf("./generated_playlists/playlist-%s.m3u", username)
+	
+	// Check if file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		http.Error(w, "Playlist not found. Please generate playlist first.", http.StatusNotFound)
+		return
+	}
+	
+	// Serve file
+	w.Header().Set("Content-Type", "audio/x-mpegurl")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=playlist-%s.m3u", username))
+	http.ServeFile(w, r, filePath)
+}
+

@@ -14,10 +14,15 @@ Panel manajemen IPTV dengan fitur import playlist M3U, relay streaming dengan fa
 - ✅ **SQLite Database** - Database lokal yang ringan
 
 ### 🚀 Fitur Advanced (NEW!)
+- ✅ **Admin Login System** - Proteksi panel dengan username & password
+- ✅ **User Management** - Kelola user, subscription, max connections
+- ✅ **User Authentication** - Streaming hanya untuk user terdaftar
+- ✅ **Subscription System** - Expired user auto-redirect ke notification video
 - ✅ **On-Demand Auto Start/Stop** - Stream otomatis mulai saat ada viewer, stop saat idle
 - ✅ **Multi-Client Single Stream** - Banyak client, hanya 1 koneksi ke provider (hemat 90%+ bandwidth!)
 - ✅ **HLS Support** - Output HLS untuk compatibility dengan semua device
 - ✅ **Stream Monitoring** - Real-time monitoring jumlah viewer dan bandwidth
+- ✅ **Playlist Generator** - Generate playlist per user dengan channel selection
 - ✅ **Resource Efficient** - CPU & bandwidth hanya digunakan saat ada yang nonton
 
 ## 🚀 Cara Install
@@ -48,9 +53,22 @@ go run main.go
 http://localhost:8080
 ```
 
+5. **Login** dengan credentials default:
+```
+Username: admin
+Password: admin123
+```
+
+⚠️ **PENTING:** Ganti password setelah login pertama kali!
+
 ## 📖 Cara Menggunakan
 
-### 1. Import Playlist M3U
+### 1. Login Admin Panel
+- Akses `http://localhost:8080/login.html`
+- Login dengan username: `admin`, password: `admin123`
+- Setelah login, Anda akan diarahkan ke dashboard
+
+### 2. Import Playlist M3U
 - Klik tab "Import M3U"
 - Masukkan nama playlist dan URL M3U
 - Klik "Import Playlist"
@@ -69,7 +87,14 @@ http://localhost:8080
 - Tambahkan multiple source URLs untuk failover
 - Relay akan otomatis switch ke source berikutnya jika source pertama gagal
 
-### 4. Export Playlist
+### 4. Kelola Users
+- Klik tab "Users"
+- Tambah user baru dengan username & password
+- Set max connections dan expiration date
+- Generate playlist per user
+- Extend subscription user yang expired
+
+### 5. Export Playlist
 - Klik "Export M3U" pada playlist yang diinginkan
 - File M3U akan didownload
 

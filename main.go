@@ -25,8 +25,23 @@ func main() {
 	// Setup router
 	r := mux.NewRouter()
 
-	// API routes
+	// Auth routes (public)
+	r.HandleFunc("/api/auth/login", handlers.Login).Methods("POST")
+	r.HandleFunc("/api/auth/logout", handlers.Logout).Methods("POST")
+	r.HandleFunc("/api/auth/check", handlers.CheckAuth).Methods("GET")
+	r.HandleFunc("/login.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./static/login.html")
+	}).Methods("GET")
+
+	// Proxy channel stream (public with user auth - must be before api subrouter)
+	r.HandleFunc("/api/proxy/channel/{id}", handlers.ProxyChannel).Methods("GET")
+	r.HandleFunc("/api/proxy/channel/{id}/hls", handlers.ProxyChannelHLS).Methods("GET")
+
+	// API routes (protected)
 	api := r.PathPrefix("/api").Subrouter()
+	api.Use(func(next http.Handler) http.Handler {
+		return handlers.AuthMiddleware(next)
+	})
 	
 	// Stats
 	api.HandleFunc("/stats", handlers.GetStats).Methods("GET")
@@ -43,10 +58,6 @@ func main() {
 	api.HandleFunc("/channels/{id}/toggle", handlers.UpdateChannelStatus).Methods("POST")
 	api.HandleFunc("/channels/{id}", handlers.DeleteChannel).Methods("DELETE")
 	api.HandleFunc("/channels/batch-delete", handlers.BatchDeleteChannels).Methods("POST")
-	
-	// Proxy channel stream
-	api.HandleFunc("/proxy/channel/{id}", handlers.ProxyChannel).Methods("GET")
-	api.HandleFunc("/proxy/channel/{id}/hls", handlers.ProxyChannelHLS).Methods("GET")
 	
 	// Relays
 	api.HandleFunc("/relays", handlers.GetRelays).Methods("GET")
@@ -75,11 +86,14 @@ func main() {
 	r.HandleFunc("/stream/{path}/hls", handlers.StreamRelayHLS).Methods("GET")
 	r.HandleFunc("/stream/{path}/hls/{segment}", handlers.StreamRelayHLSSegment).Methods("GET")
 
-	// Serve generated playlists
+	// Serve user playlists with short URL: /mql/{user}.m3u
+	r.HandleFunc("/mql/{user:[a-zA-Z0-9_-]+}.m3u", handlers.ServeUserPlaylist).Methods("GET")
+	
+	// Serve generated playlists (legacy support)
 	r.PathPrefix("/generated_playlists/").Handler(http.StripPrefix("/generated_playlists/", http.FileServer(http.Dir("./generated_playlists"))))
 	
-	// Serve static files
-	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./static")))
+	// Serve static files with auth middleware
+	r.PathPrefix("/").Handler(handlers.StaticAuthMiddleware(http.FileServer(http.Dir("./static"))))
 
 	// Get port from environment or use default
 	port := os.Getenv("PORT")

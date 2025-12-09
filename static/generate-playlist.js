@@ -337,11 +337,12 @@ async function saveAndCopyPlaylistURL() {
         const result = await response.json();
         
         if (result.success) {
-            const fullUrl = `http://${window.location.host}${result.url}`;
+            // Use short URL format: /mql/{user}.m3u
+            const fullUrl = `http://${window.location.host}/mql/${username}.m3u`;
             document.getElementById('generatedPlaylistUrl').value = fullUrl;
             document.getElementById('playlistUrlBox').style.display = 'block';
             
-            alert(`✅ Playlist saved!\n\nFile: ${filename}\nChannels: ${selectedChannelsList.length}\n\nURL sudah tersedia di bawah.`);
+            alert(`✅ Playlist saved!\n\nFile: ${filename}\nChannels: ${selectedChannelsList.length}\n\nURL: /mql/${username}.m3u\n\nURL sudah tersedia di bawah.`);
         } else {
             alert('Error saving playlist');
         }

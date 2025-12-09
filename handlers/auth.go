@@ -1,0 +1,154 @@
+package handlers
+
+import (
+	"crypto/md5"
+	"encoding/json"
+	"fmt"
+	"iptv-panel/database"
+	"net/http"
+	"time"
+
+	"github.com/gorilla/sessions"
+)
+
+var store = sessions.NewCookieStore([]byte("iptv-panel-secret-key-change-in-production"))
+
+func init() {
+	store.Options = &sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7, // 7 days
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	}
+}
+
+// Login handles admin login
+func Login(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Hash password
+	hashedPassword := fmt.Sprintf("%x", md5.Sum([]byte(req.Password)))
+
+	// Check admin credentials in database
+	var adminID int
+	var username string
+	err := database.DB.QueryRow(
+		"SELECT id, username FROM admins WHERE username = ? AND password = ?",
+		req.Username, hashedPassword,
+	).Scan(&adminID, &username)
+
+	if err != nil {
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		return
+	}
+
+	// Create session
+	session, _ := store.Get(r, "admin-session")
+	session.Values["admin_id"] = adminID
+	session.Values["username"] = username
+	session.Values["logged_in"] = true
+	session.Save(r, w)
+
+	// Update last login
+	database.DB.Exec("UPDATE admins SET last_login = ? WHERE id = ?", time.Now(), adminID)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":  true,
+		"message":  "Login successful",
+		"username": username,
+	})
+}
+
+// Logout handles admin logout
+func Logout(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "admin-session")
+	session.Values["logged_in"] = false
+	session.Options.MaxAge = -1
+	session.Save(r, w)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Logout successful",
+	})
+}
+
+// CheckAuth checks if user is authenticated
+func CheckAuth(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "admin-session")
+	loggedIn, ok := session.Values["logged_in"].(bool)
+	username, _ := session.Values["username"].(string)
+
+	if ok && loggedIn {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"authenticated": true,
+			"username":      username,
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"authenticated": false,
+	})
+}
+
+// AuthMiddleware protects routes
+func AuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		session, _ := store.Get(r, "admin-session")
+		loggedIn, ok := session.Values["logged_in"].(bool)
+
+		if !ok || !loggedIn {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// StaticAuthMiddleware protects static HTML files only
+func StaticAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		
+		// Allow public files
+		if path == "/login.html" || 
+		   path == "/styles.css" || 
+		   path == "/app.js" ||
+		   path == "/playlist.js" ||
+		   path == "/channels.js" ||
+		   path == "/bandwidth.js" ||
+		   path == "/relay.js" ||
+		   path == "/users.js" ||
+		   path == "/generate-playlist.js" ||
+		   path == "/expired-notification.mp4" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		
+		// For HTML files (including /), check auth
+		if path == "/" || path == "/index.html" || path == "/index-new.html" {
+			session, _ := store.Get(r, "admin-session")
+			loggedIn, ok := session.Values["logged_in"].(bool)
+			
+			if !ok || !loggedIn {
+				http.Redirect(w, r, "/login.html", http.StatusFound)
+				return
+			}
+		}
+		
+		next.ServeHTTP(w, r)
+	})
+}

@@ -1,0 +1,49 @@
+#EXTM3U
+# IPTV Playlist for: tes
+# Generated: 9/12/2025, 15.00.23
+# Total Channels: 22
+
+#EXTINF:-1 tvg-id="4696" tvg-name="ANTV" group-title="LOKAL INDONESIA™",ANTV
+http://localhost:8080/api/proxy/channel/4696?username=tes&password=tes
+#EXTINF:-1 tvg-id="4702" tvg-name="Bali TV" group-title="LOKAL INDONESIA™",Bali TV
+http://localhost:8080/api/proxy/channel/4702?username=tes&password=tes
+#EXTINF:-1 tvg-id="4686" tvg-name="GTV" group-title="LOKAL INDONESIA™",GTV
+http://localhost:8080/api/proxy/channel/4686?username=tes&password=tes
+#EXTINF:-1 tvg-id="4881" tvg-name="Indosiar" group-title="LOKAL INDONESIA™",Indosiar
+http://localhost:8080/api/proxy/channel/4881?username=tes&password=tes
+#EXTINF:-1 tvg-id="4690" tvg-name="Indosiar (Sport)" group-title="LOKAL INDONESIA™",Indosiar (Sport)
+http://localhost:8080/api/proxy/channel/4690?username=tes&password=tes
+#EXTINF:-1 tvg-id="4694" tvg-name="Kompas tv" group-title="LOKAL INDONESIA™",Kompas tv
+http://localhost:8080/api/proxy/channel/4694?username=tes&password=tes
+#EXTINF:-1 tvg-id="4698" tvg-name="METRO TV HD" group-title="LOKAL INDONESIA™",METRO TV HD
+http://localhost:8080/api/proxy/channel/4698?username=tes&password=tes
+#EXTINF:-1 tvg-id="4685" tvg-name="MNC TV" group-title="LOKAL INDONESIA™",MNC TV
+http://localhost:8080/api/proxy/channel/4685?username=tes&password=tes
+#EXTINF:-1 tvg-id="4700" tvg-name="Moji TV" group-title="LOKAL INDONESIA™",Moji TV
+http://localhost:8080/api/proxy/channel/4700?username=tes&password=tes
+#EXTINF:-1 tvg-id="4693" tvg-name="NET TV" group-title="LOKAL INDONESIA™",NET TV
+http://localhost:8080/api/proxy/channel/4693?username=tes&password=tes
+#EXTINF:-1 tvg-id="4800" tvg-name="RCTI" group-title="LOKAL INDONESIA™",RCTI
+http://localhost:8080/api/proxy/channel/4800?username=tes&password=tes
+#EXTINF:-1 tvg-id="4684" tvg-name="RCTI (Sport)" group-title="LOKAL INDONESIA™",RCTI (Sport)
+http://localhost:8080/api/proxy/channel/4684?username=tes&password=tes
+#EXTINF:-1 tvg-id="4699" tvg-name="RTV FHD" group-title="LOKAL INDONESIA™",RTV FHD
+http://localhost:8080/api/proxy/channel/4699?username=tes&password=tes
+#EXTINF:-1 tvg-id="4692" tvg-name="SCTV" group-title="LOKAL INDONESIA™",SCTV
+http://localhost:8080/api/proxy/channel/4692?username=tes&password=tes
+#EXTINF:-1 tvg-id="4691" tvg-name="SCTV (Sport)" group-title="LOKAL INDONESIA™",SCTV (Sport)
+http://localhost:8080/api/proxy/channel/4691?username=tes&password=tes
+#EXTINF:-1 tvg-id="4697" tvg-name="TV ONE" group-title="LOKAL INDONESIA™",TV ONE
+http://localhost:8080/api/proxy/channel/4697?username=tes&password=tes
+#EXTINF:-1 tvg-id="4695" tvg-name="TVRI" group-title="LOKAL INDONESIA™",TVRI
+http://localhost:8080/api/proxy/channel/4695?username=tes&password=tes
+#EXTINF:-1 tvg-id="4688" tvg-name="Trans 7" group-title="LOKAL INDONESIA™",Trans 7
+http://localhost:8080/api/proxy/channel/4688?username=tes&password=tes
+#EXTINF:-1 tvg-id="4780" tvg-name="Trans 7 Transmedia" group-title="LOKAL INDONESIA™",Trans 7 Transmedia
+http://localhost:8080/api/proxy/channel/4780?username=tes&password=tes
+#EXTINF:-1 tvg-id="4689" tvg-name="Trans TV" group-title="LOKAL INDONESIA™",Trans TV
+http://localhost:8080/api/proxy/channel/4689?username=tes&password=tes
+#EXTINF:-1 tvg-id="4781" tvg-name="Trans TV Transmedia" group-title="LOKAL INDONESIA™",Trans TV Transmedia
+http://localhost:8080/api/proxy/channel/4781?username=tes&password=tes
+#EXTINF:-1 tvg-id="4687" tvg-name="i News" group-title="LOKAL INDONESIA™",i News
+http://localhost:8080/api/proxy/channel/4687?username=tes&password=tes

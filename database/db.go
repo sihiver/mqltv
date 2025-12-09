@@ -88,6 +88,16 @@ func createTables() error {
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 			FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE SET NULL
 		)`,
+		`CREATE TABLE IF NOT EXISTS admins (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			username TEXT NOT NULL UNIQUE,
+			password TEXT NOT NULL,
+			full_name TEXT,
+			email TEXT,
+			is_active INTEGER DEFAULT 1,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			last_login DATETIME
+		)`,
 	}
 
 	for _, query := range queries {
@@ -96,8 +106,28 @@ func createTables() error {
 		}
 	}
 
+	// Create default admin if not exists
+	createDefaultAdmin()
+
 	log.Println("Database tables created successfully")
 	return nil
+}
+
+func createDefaultAdmin() {
+	var count int
+	DB.QueryRow("SELECT COUNT(*) FROM admins").Scan(&count)
+	
+	if count == 0 {
+		// Default password: admin123 (MD5 hashed)
+		defaultPassword := "0192023a7bbd73250516f069df18b500" // MD5 of "admin123"
+		_, err := DB.Exec(
+			"INSERT INTO admins (username, password, full_name, is_active) VALUES (?, ?, ?, ?)",
+			"admin", defaultPassword, "Administrator", 1,
+		)
+		if err == nil {
+			log.Println("✅ Default admin created - Username: admin, Password: admin123")
+		}
+	}
 }
 
 func Close() {
