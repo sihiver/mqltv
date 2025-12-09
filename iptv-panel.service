@@ -1,0 +1,23 @@
+[Unit]
+Description=IPTV Panel Service
+After=network.target
+
+[Service]
+Type=simple
+User=dindin
+WorkingDirectory=/home/dindin/mqltv
+ExecStart=/home/dindin/mqltv/iptv-panel
+Restart=always
+RestartSec=5
+StandardOutput=append:/home/dindin/mqltv/server.log
+StandardError=append:/home/dindin/mqltv/server.log
+
+# Environment variables
+Environment="DB_PATH=/home/dindin/mqltv/iptv.db"
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
