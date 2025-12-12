@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"iptv-panel/database"
 	"iptv-panel/models"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -630,10 +631,10 @@ func GenerateUserPlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := fmt.Sprintf(`
-		SELECT id, name, logo, group_name, url 
-		FROM channels
-		WHERE id IN (%s) AND active = 1
-		ORDER BY group_name, name
+		SELECT c.id, c.name, c.logo, c.group_name, c.url 
+		FROM channels c
+		WHERE c.id IN (%s) AND c.active = 1
+		ORDER BY c.group_name, c.name
 	`, strings.Join(placeholders, ","))
 
 	rows, err := database.DB.Query(query, args...)
@@ -648,6 +649,25 @@ func GenerateUserPlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
+	// Collect channel data first (avoid database locked)
+	type channelData struct {
+		ID        int
+		Name      string
+		Logo      string
+		Group     string
+		SourceURL string
+	}
+	var channelsData []channelData
+
+	for rows.Next() {
+		var ch channelData
+		if err := rows.Scan(&ch.ID, &ch.Name, &ch.Logo, &ch.Group, &ch.SourceURL); err != nil {
+			continue
+		}
+		channelsData = append(channelsData, ch)
+	}
+	rows.Close() // Close rows before creating relays
+
 	// Build M3U content
 	m3uContent := "#EXTM3U\n"
 	host := os.Getenv("HOST")
@@ -656,17 +676,30 @@ func GenerateUserPlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	channelCount := 0
-	for rows.Next() {
-		var id int
-		var name, logo, group, url string
-		if err := rows.Scan(&id, &name, &logo, &group, &url); err != nil {
-			continue
+	for _, ch := range channelsData {
+		// Create or get relay for this channel
+		relayPath := fmt.Sprintf("channel-%d", ch.ID)
+		
+		// Check if relay exists, if not create it
+		var relayID int
+		err := database.DB.QueryRow("SELECT id FROM relays WHERE output_path = ?", relayPath).Scan(&relayID)
+		if err == sql.ErrNoRows {
+			// Create new relay
+			sourceURLsJSON := fmt.Sprintf("[\"%s\"]", ch.SourceURL)
+			_, err = database.DB.Exec(
+				"INSERT INTO relays (name, source_urls, output_path, active) VALUES (?, ?, ?, 1)",
+				ch.Name, sourceURLsJSON, relayPath,
+			)
+			if err != nil {
+				log.Printf("Failed to create relay for channel %d: %v", ch.ID, err)
+				continue
+			}
 		}
 
 		m3uContent += fmt.Sprintf("#EXTINF:-1 tvg-id=\"%d\" tvg-name=\"%s\" tvg-logo=\"%s\" group-title=\"%s\",%s\n",
-			id, name, logo, group, name)
-		m3uContent += fmt.Sprintf("%s?username=%s&password=%s\n",
-			url, user.Username, user.Password)
+			ch.ID, ch.Name, ch.Logo, ch.Group, ch.Name)
+		m3uContent += fmt.Sprintf("http://%s/stream/%s?username=%s&password=%s\n",
+			host, relayPath, user.Username, user.Password)
 		channelCount++
 	}
 

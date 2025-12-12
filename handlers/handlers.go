@@ -358,7 +358,7 @@ func StreamRelay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify user credentials and check if active
-	passwordHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
+	// Password from M3U URL is already MD5 hashed
 	var userID int
 	var isActive bool
 	var expiresAt sql.NullTime
@@ -367,7 +367,7 @@ func StreamRelay(w http.ResponseWriter, r *http.Request) {
 		SELECT id, is_active, expires_at 
 		FROM users 
 		WHERE username = ? AND password = ?
-	`, username, passwordHash).Scan(&userID, &isActive, &expiresAt)
+	`, username, password).Scan(&userID, &isActive, &expiresAt)
 	
 	if err == sql.ErrNoRows {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)

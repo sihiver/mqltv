@@ -93,9 +93,9 @@ func main() {
 	api.HandleFunc("/generated-playlists", handlers.SaveGeneratedPlaylist).Methods("POST")
 	
 	// Stream relay endpoints (on-demand, multi-client)
-	r.HandleFunc("/stream/{path}", handlers.StreamRelay).Methods("GET")
-	r.HandleFunc("/stream/{path}/hls", handlers.StreamRelayHLS).Methods("GET")
-	r.HandleFunc("/stream/{path}/hls/{segment}", handlers.StreamRelayHLSSegment).Methods("GET")
+	r.HandleFunc("/stream/{path:.+}", handlers.StreamRelay).Methods("GET")
+	r.HandleFunc("/stream/{path:.+}/hls", handlers.StreamRelayHLS).Methods("GET")
+	r.HandleFunc("/stream/{path:.+}/hls/{segment}", handlers.StreamRelayHLSSegment).Methods("GET")
 
 	// Serve user playlists with short URL: /mql/{user}.m3u
 	r.HandleFunc("/mql/{user:[a-zA-Z0-9_-]+}.m3u", handlers.ServeUserPlaylist).Methods("GET")
