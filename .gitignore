@@ -2,3 +2,10 @@ iptv-panel
 iptv.db
 *.log
 nohup.out
+
+# Vue Panel
+pannel/node_modules/
+pannel/dist/
+pannel/.vscode/
+pannel/pnpm-lock.yaml
+pannel/package-lock.json

@@ -48,15 +48,19 @@ func main() {
 	
 	// Stats
 	api.HandleFunc("/stats", handlers.GetStats).Methods("GET")
+	api.HandleFunc("/recently-watched", handlers.GetRecentlyWatchedChannels).Methods("GET")
 	
 	// Playlists
 	api.HandleFunc("/playlists", handlers.GetPlaylists).Methods("GET")
 	api.HandleFunc("/playlists/import", handlers.ImportPlaylist).Methods("POST")
+	api.HandleFunc("/playlists/{id}", handlers.UpdatePlaylist).Methods("PUT")
 	api.HandleFunc("/playlists/{id}", handlers.DeletePlaylist).Methods("DELETE")
+	api.HandleFunc("/playlists/{id}/refresh", handlers.RefreshPlaylist).Methods("POST")
 	api.HandleFunc("/playlists/{id}/channels", handlers.GetChannels).Methods("GET")
 	api.HandleFunc("/playlists/{id}/export", handlers.ExportM3U).Methods("GET")
 	
 	// Channels
+	api.HandleFunc("/channels", handlers.SearchChannels).Methods("GET")
 	api.HandleFunc("/channels/search", handlers.SearchChannels).Methods("GET")
 	api.HandleFunc("/channels/{id}/toggle", handlers.UpdateChannelStatus).Methods("POST")
 	api.HandleFunc("/channels/{id}", handlers.DeleteChannel).Methods("DELETE")
@@ -74,12 +78,16 @@ func main() {
 	// Users
 	api.HandleFunc("/users", handlers.GetUsers).Methods("GET")
 	api.HandleFunc("/users", handlers.CreateUser).Methods("POST")
+	api.HandleFunc("/users/{id}", handlers.GetUserDetail).Methods("GET")
 	api.HandleFunc("/users/{id}", handlers.UpdateUser).Methods("PUT")
 	api.HandleFunc("/users/{id}", handlers.DeleteUser).Methods("DELETE")
 	api.HandleFunc("/users/{id}/reset-password", handlers.ResetUserPassword).Methods("POST")
 	api.HandleFunc("/users/{id}/connections", handlers.GetUserConnections).Methods("GET")
 	api.HandleFunc("/users/{id}/set-expired", handlers.SetUserExpired).Methods("POST")
 	api.HandleFunc("/users/{id}/extend", handlers.ExtendSubscription).Methods("POST")
+	
+	// Generate playlist
+	api.HandleFunc("/generate-playlist", handlers.GenerateUserPlaylist).Methods("POST")
 	
 	// Generated Playlists
 	api.HandleFunc("/generated-playlists", handlers.SaveGeneratedPlaylist).Methods("POST")

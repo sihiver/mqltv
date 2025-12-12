@@ -62,9 +62,13 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":  true,
-		"message":  "Login successful",
-		"username": username,
+		"code": 0,
+		"data": map[string]interface{}{
+			"username": username,
+			"role":     "admin",
+			"roleId":   "1",
+		},
+		"message": "Login successful",
 	})
 }
 
@@ -77,7 +81,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
+		"code":    0,
 		"message": "Logout successful",
 	})
 }

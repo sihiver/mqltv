@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -43,7 +44,10 @@ func GetPlaylists(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(playlists)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code": 0,
+		"data": playlists,
+	})
 }
 
 // ImportPlaylist imports M3U playlist
@@ -98,9 +102,12 @@ func ImportPlaylist(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":     true,
-		"playlist_id": playlistID,
-		"channels":    len(channels),
+		"code": 0,
+		"data": map[string]interface{}{
+			"playlist_id": playlistID,
+			"channels":    len(channels),
+		},
+		"message": "Playlist imported successfully",
 	})
 }
 
@@ -131,7 +138,111 @@ func GetChannels(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(channels)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code": 0,
+		"data": channels,
+	})
+}
+
+// RefreshPlaylist re-imports playlist from the same URL
+func RefreshPlaylist(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	playlistID := vars["id"]
+
+	// Get playlist URL
+	var playlistURL string
+	err := database.DB.QueryRow("SELECT url FROM playlists WHERE id = ?", playlistID).Scan(&playlistURL)
+	if err != nil {
+		http.Error(w, "Playlist not found", http.StatusNotFound)
+		return
+	}
+
+	// Parse M3U from URL
+	channels, err := parser.ParseM3UURL(playlistURL)
+	if err != nil {
+		http.Error(w, "Failed to parse M3U: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Start transaction
+	tx, err := database.DB.Begin()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+
+	// Delete old channels
+	_, err = tx.Exec("DELETE FROM channels WHERE playlist_id = ?", playlistID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Insert new channels
+	channelCount := 0
+	for _, ch := range channels {
+		_, err := tx.Exec("INSERT INTO channels (playlist_id, name, url, logo, group_name) VALUES (?, ?, ?, ?, ?)",
+			playlistID, ch.Name, ch.URL, ch.Logo, ch.Group)
+		if err != nil {
+			log.Printf("Failed to insert channel: %v", err)
+		} else {
+			channelCount++
+		}
+	}
+
+	// Update playlist timestamp
+	_, err = tx.Exec("UPDATE playlists SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", playlistID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    0,
+		"message": "Playlist refreshed successfully",
+		"channels_count": channelCount,
+	})
+}
+
+// UpdatePlaylist updates playlist name and URL
+func UpdatePlaylist(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	playlistID := vars["id"]
+
+	var req struct {
+		Name string `json:"name"`
+		URL  string `json:"url"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Name == "" {
+		http.Error(w, "Name is required", http.StatusBadRequest)
+		return
+	}
+
+	_, err := database.DB.Exec("UPDATE playlists SET name = ?, url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", 
+		req.Name, req.URL, playlistID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    0,
+		"message": "Playlist updated successfully",
+	})
 }
 
 // DeletePlaylist deletes a playlist and its channels
@@ -154,7 +265,11 @@ func DeletePlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    0,
+		"data":    map[string]bool{"success": true},
+		"message": "Playlist deleted successfully",
+	})
 }
 
 // GetRelays returns all relays
@@ -176,7 +291,10 @@ func GetRelays(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(relays)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code": 0,
+		"data": relays,
+	})
 }
 
 // CreateRelay creates a new relay configuration
@@ -401,8 +519,12 @@ func UpdateChannelStatus(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"active":  newActive == 1,
+		"code":    0,
+		"message": "Channel status updated",
+		"data": map[string]interface{}{
+			"success": true,
+			"active":  newActive == 1,
+		},
 	})
 }
 
@@ -425,50 +547,82 @@ func DeleteChannel(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
+		"code":    0,
+		"data":    map[string]bool{"success": true},
 		"message": "Channel deleted successfully",
 	})
 }
 
-// BatchDeleteChannels deletes multiple channels by category
+// BatchDeleteChannels deletes multiple channels by IDs
 func BatchDeleteChannels(w http.ResponseWriter, r *http.Request) {
 	var request struct {
+		IDs        []int  `json:"ids"`
 		Category   string `json:"category"`
 		PlaylistID int    `json:"playlist_id"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"data":    nil,
+			"message": "Invalid request body",
+		})
 		return
 	}
 
-	if request.Category == "" {
-		http.Error(w, "Category is required", http.StatusBadRequest)
+	var query string
+	var args []interface{}
+	var rowsAffected int64
+
+	// Delete by IDs (new method)
+	if len(request.IDs) > 0 {
+		placeholders := make([]string, len(request.IDs))
+		for i, id := range request.IDs {
+			placeholders[i] = "?"
+			args = append(args, id)
+		}
+		query = fmt.Sprintf("DELETE FROM channels WHERE id IN (%s)", strings.Join(placeholders, ","))
+	} else if request.Category != "" {
+		// Delete by category (legacy method)
+		query = "DELETE FROM channels WHERE group_name = ?"
+		args = []interface{}{request.Category}
+
+		if request.PlaylistID > 0 {
+			query += " AND playlist_id = ?"
+			args = append(args, request.PlaylistID)
+		}
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"data":    nil,
+			"message": "Either IDs or category is required",
+		})
 		return
-	}
-
-	// Delete all channels in the category
-	query := "DELETE FROM channels WHERE group_name = ?"
-	args := []interface{}{request.Category}
-
-	if request.PlaylistID > 0 {
-		query += " AND playlist_id = ?"
-		args = append(args, request.PlaylistID)
 	}
 
 	result, err := database.DB.Exec(query, args...)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"data":    nil,
+			"message": "Failed to delete channels",
+		})
 		return
 	}
 
-	rowsAffected, _ := result.RowsAffected()
+	rowsAffected, _ = result.RowsAffected()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"deleted": rowsAffected,
-		"message": fmt.Sprintf("Deleted %d channels from category '%s'", rowsAffected, request.Category),
+		"code": 0,
+		"data": map[string]interface{}{
+			"success": true,
+			"deleted": rowsAffected,
+		},
+		"message": fmt.Sprintf("Deleted %d channels", rowsAffected),
 	})
 }
 
@@ -480,12 +634,25 @@ func SearchChannels(w http.ResponseWriter, r *http.Request) {
 	var err error
 	
 	if query == "" {
-		// If no query, return all active channels
-		rows, err = database.DB.Query("SELECT id, playlist_id, name, url, logo, group_name, active, created_at FROM channels WHERE active = 1 ORDER BY name LIMIT 5000")
+		// If no query, return all active channels with playlist info
+		rows, err = database.DB.Query(`
+			SELECT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at, p.name as playlist_name
+			FROM channels c
+			LEFT JOIN playlists p ON c.playlist_id = p.id
+			WHERE c.active = 1 
+			ORDER BY c.created_at DESC 
+			LIMIT 5000
+		`)
 	} else {
 		// If query provided, search by name
-		rows, err = database.DB.Query("SELECT id, playlist_id, name, url, logo, group_name, active, created_at FROM channels WHERE name LIKE ? AND active = 1 ORDER BY name LIMIT 5000",
-			"%"+query+"%")
+		rows, err = database.DB.Query(`
+			SELECT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at, p.name as playlist_name
+			FROM channels c
+			LEFT JOIN playlists p ON c.playlist_id = p.id
+			WHERE c.name LIKE ? AND c.active = 1 
+			ORDER BY c.created_at DESC 
+			LIMIT 5000
+		`, "%"+query+"%")
 	}
 	
 	if err != nil {
@@ -494,17 +661,40 @@ func SearchChannels(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	var channels []models.Channel
+	var channels []map[string]interface{}
 	for rows.Next() {
 		var c models.Channel
-		if err := rows.Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, &c.Active, &c.CreatedAt); err != nil {
+		var playlistName sql.NullString
+		if err := rows.Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, &c.Active, &c.CreatedAt, &playlistName); err != nil {
 			continue
 		}
-		channels = append(channels, c)
+		
+		channel := map[string]interface{}{
+			"id":            c.ID,
+			"playlist_id":   c.PlaylistID,
+			"name":          c.Name,
+			"url":           c.URL,
+			"logo":          c.Logo,
+			"category":      c.Group,
+			"group_name":    c.Group,
+			"enabled":       c.Active,
+			"active":        c.Active,
+			"created_at":    c.CreatedAt,
+			"playlist_name": "",
+		}
+		
+		if playlistName.Valid {
+			channel["playlist_name"] = playlistName.String
+		}
+		
+		channels = append(channels, channel)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(channels)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code": 0,
+		"data": channels,
+	})
 }
 
 // GetStats returns dashboard statistics
@@ -518,11 +708,78 @@ func GetStats(w http.ResponseWriter, r *http.Request) {
 
 	database.DB.QueryRow("SELECT COUNT(*) FROM playlists").Scan(&stats.TotalPlaylists)
 	database.DB.QueryRow("SELECT COUNT(*) FROM channels").Scan(&stats.TotalChannels)
-	database.DB.QueryRow("SELECT COUNT(*) FROM channels WHERE active = 1").Scan(&stats.ActiveChannels)
+	// Count channels being watched (have active connections)
+	database.DB.QueryRow(`
+		SELECT COUNT(DISTINCT channel_id) 
+		FROM user_connections 
+		WHERE channel_id IS NOT NULL 
+		AND disconnected_at IS NULL
+	`).Scan(&stats.ActiveChannels)
 	database.DB.QueryRow("SELECT COUNT(*) FROM relays").Scan(&stats.TotalRelays)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code": 0,
+		"data": stats,
+	})
+}
+
+// GetRecentlyWatchedChannels returns channels that were recently watched by users
+func GetRecentlyWatchedChannels(w http.ResponseWriter, r *http.Request) {
+	rows, err := database.DB.Query(`
+		SELECT DISTINCT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at, p.name as playlist_name, MAX(uc.connected_at) as last_watched
+		FROM user_connections uc
+		INNER JOIN channels c ON uc.channel_id = c.id
+		LEFT JOIN playlists p ON c.playlist_id = p.id
+		WHERE uc.channel_id IS NOT NULL
+		GROUP BY c.id
+		ORDER BY last_watched DESC
+		LIMIT 10
+	`)
+	
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var channels []map[string]interface{}
+	for rows.Next() {
+		var c models.Channel
+		var playlistName sql.NullString
+		var lastWatched time.Time
+		
+		if err := rows.Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, &c.Active, &c.CreatedAt, &playlistName, &lastWatched); err != nil {
+			continue
+		}
+		
+		channel := map[string]interface{}{
+			"id":            c.ID,
+			"playlist_id":   c.PlaylistID,
+			"name":          c.Name,
+			"url":           c.URL,
+			"logo":          c.Logo,
+			"category":      c.Group,
+			"group_name":    c.Group,
+			"enabled":       c.Active,
+			"active":        c.Active,
+			"created_at":    c.CreatedAt,
+			"playlist_name": "",
+			"last_watched":  lastWatched,
+		}
+		
+		if playlistName.Valid {
+			channel["playlist_name"] = playlistName.String
+		}
+		
+		channels = append(channels, channel)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code": 0,
+		"data": channels,
+	})
 }
 
 // ProxyChannel proxies a specific channel stream via FFmpeg
