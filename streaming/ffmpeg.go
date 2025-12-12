@@ -2,6 +2,7 @@ package streaming
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os/exec"
 	"strings"
@@ -27,6 +28,9 @@ type FFmpegSession struct {
 	bytesRead     uint64 // Total bytes from source
 	bytesWritten  uint64 // Total bytes to clients
 	bytesMux      sync.RWMutex
+	retryCount    int       // Number of consecutive failures
+	lastFailTime  time.Time // Last time FFmpeg failed
+	isBlacklisted bool      // If true, stop trying to restart
 }
 
 // StreamPipe handles FFmpeg output piping to multiple clients
@@ -93,7 +97,12 @@ func (m *FFmpegManager) GetOrCreateFFmpegSession(streamID string, sourceURLs []s
 }
 
 // AddClient adds a client to FFmpeg session
-func (s *FFmpegSession) AddClient(clientID, remoteAddr string) chan []byte {
+func (s *FFmpegSession) AddClient(clientID, remoteAddr string) (chan []byte, error) {
+	// Check if blacklisted
+	if s.isBlacklisted {
+		return nil, fmt.Errorf("channel is offline or unavailable")
+	}
+	
 	s.clientsMux.Lock()
 	defer s.clientsMux.Unlock()
 
@@ -119,7 +128,7 @@ func (s *FFmpegSession) AddClient(clientID, remoteAddr string) chan []byte {
 		go s.Start()
 	}
 
-	return dataChan
+	return dataChan, nil
 }
 
 // RemoveClient removes client from FFmpeg session
@@ -165,6 +174,7 @@ func (s *FFmpegSession) Start() {
 		return
 	}
 	s.isActive = true
+	s.startTime = time.Now() // Set start time here
 	s.activeMux.Unlock()
 
 	log.Printf("▶️  Starting FFmpeg stream: %s", s.ID)
@@ -192,15 +202,22 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-reconnect_streamed", "1",    // Reconnect for streamed protocols
 		"-reconnect_delay_max", "5",   // Max 5 seconds between reconnects
 		"-timeout", "10000000",        // 10 second timeout (in microseconds)
-		"-fflags", "nobuffer+fastseek", // No buffering + fast seek
+		"-fflags", "+genpts+discardcorrupt", // Generate PTS + discard corrupt packets
 		"-flags", "low_delay",         // Low delay flag
-		"-analyzeduration", "500000",  // 0.5 second analysis (faster)
-		"-probesize", "500000",        // Smaller probe (faster start)
+		"-analyzeduration", "5000000", // 5 seconds analysis (detect all streams)
+		"-probesize", "5000000",       // 5MB probe (ensure video detected)
 		"-i", sourceURL,               // Input URL
+		"-map", "0:v?",                // Map video stream (optional, won't fail if missing)
+		"-map", "0:a?",                // Map audio stream (optional, won't fail if missing)
 		"-c", "copy",                  // Copy codec (no transcoding)
 		"-f", "mpegts",                // Output format MPEG-TS
 		"-avoid_negative_ts", "make_zero", // Avoid timestamp issues
 		"-max_muxing_queue_size", "9999", // Large muxing queue for stability
+		"-bsf:v", "h264_mp4toannexb,dump_extra", // H264 conversion + dump extra data (SPS/PPS)
+		"-async", "1",                 // Audio sync method (resample)
+		"-vsync", "cfr",               // Video sync constant frame rate
+		"-start_at_zero",              // Start timestamps at zero
+		"-copytb", "1",                // Copy input timebase
 		"pipe:1",                      // Output to stdout
 	}
 
@@ -212,15 +229,22 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			"-reconnect_streamed", "1",
 			"-reconnect_delay_max", "5",
 			"-timeout", "10000000",
-			"-fflags", "nobuffer+fastseek",
+			"-fflags", "+genpts+discardcorrupt",
 			"-flags", "low_delay",
-			"-analyzeduration", "500000",
-			"-probesize", "500000",
+			"-analyzeduration", "5000000", // 5 seconds analysis
+			"-probesize", "5000000",       // 5MB probe
 			"-i", sourceURL,
+			"-map", "0:v?",                // Map video (optional)
+			"-map", "0:a?",                // Map audio (optional)
 			"-c", "copy",
 			"-f", "mpegts",
 			"-avoid_negative_ts", "make_zero",
 			"-max_muxing_queue_size", "9999",
+			"-bsf:v", "h264_mp4toannexb,dump_extra",
+			"-async", "1",
+			"-vsync", "cfr",
+			"-start_at_zero",
+			"-copytb", "1",
 			"pipe:1",
 		}
 	}
@@ -343,7 +367,34 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			log.Printf("⏹️  FFmpeg stopped (shutdown): %s", s.ID)
 		default:
 			if hasClients {
-				log.Printf("⚠️  FFmpeg died unexpectedly for %s, restarting in 2 seconds...", s.ID)
+				// Check if stream is running for less than 30 seconds (likely offline/bad stream)
+				runDuration := time.Since(s.startTime)
+				
+				// Increment retry count if failed quickly (< 30 seconds)
+				if runDuration < 30*time.Second {
+				s.retryCount++
+				s.lastFailTime = time.Now()
+				log.Printf("⚠️  FFmpeg died after %v for %s (retry: %d/2)", runDuration, s.ID, s.retryCount)
+			} else {
+					// Reset retry count if stream ran successfully for > 30 seconds
+					s.retryCount = 0
+				}
+				
+				// Blacklist if failed 2 times in a row
+				if s.retryCount >= 2 {
+					s.isBlacklisted = true
+					log.Printf("🚫 Channel %s blacklisted after %d consecutive failures. Source likely offline.", s.ID, s.retryCount)
+					
+					// Disconnect all clients
+					s.clientsMux.Lock()
+					for clientID := range s.clients {
+						delete(s.clients, clientID)
+					}
+					s.clientsMux.Unlock()
+					
+					return
+				}
+				
 				time.Sleep(2 * time.Second)
 				
 				// Mark as inactive and try to restart
@@ -351,13 +402,13 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 				s.isActive = false
 				s.activeMux.Unlock()
 				
-				// Restart if still have clients
+				// Restart if still have clients and not blacklisted
 				s.clientsMux.RLock()
 				stillHasClients := len(s.clients) > 0
 				s.clientsMux.RUnlock()
 				
-				if stillHasClients {
-					log.Printf("🔄 Auto-restarting FFmpeg: %s", s.ID)
+				if stillHasClients && !s.isBlacklisted {
+					log.Printf("🔄 Auto-restarting FFmpeg: %s (attempt %d/5)", s.ID, s.retryCount+1)
 					go s.Start()
 				}
 			} else {

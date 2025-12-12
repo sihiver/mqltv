@@ -109,7 +109,11 @@ func GetChannels(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	playlistID := vars["id"]
 
-	rows, err := database.DB.Query("SELECT id, playlist_id, name, url, logo, group_name, active, created_at FROM channels WHERE playlist_id = ?", playlistID)
+	rows, err := database.DB.Query(`
+		SELECT id, playlist_id, name, url, logo, group_name, active, created_at 
+		FROM channels 
+		WHERE playlist_id = ?
+	`, playlistID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -119,7 +123,8 @@ func GetChannels(w http.ResponseWriter, r *http.Request) {
 	var channels []models.Channel
 	for rows.Next() {
 		var c models.Channel
-		if err := rows.Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, &c.Active, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, 
+			&c.Active, &c.CreatedAt); err != nil {
 			continue
 		}
 		channels = append(channels, c)
@@ -285,7 +290,11 @@ func StreamRelay(w http.ResponseWriter, r *http.Request) {
 	clientID := fmt.Sprintf("%x", md5.Sum([]byte(r.RemoteAddr+r.UserAgent())))
 
 	// Add client and get data channel
-	dataChan := session.AddClient(clientID, r.RemoteAddr)
+	dataChan, err := session.AddClient(clientID, r.RemoteAddr)
+	if err != nil {
+		http.Error(w, "Channel temporarily unavailable: "+err.Error(), http.StatusServiceUnavailable)
+		return
+	}
 	defer session.RemoveClient(clientID)
 
 	// Set headers
@@ -587,7 +596,11 @@ func ProxyChannel(w http.ResponseWriter, r *http.Request) {
 	session := ffmpegManager.GetOrCreateFFmpegSession(sessionID, []string{url}, "mpegts")
 
 	clientID := fmt.Sprintf("%x", md5.Sum([]byte(r.RemoteAddr+r.UserAgent())))
-	dataChan := session.AddClient(clientID, r.RemoteAddr)
+	dataChan, err := session.AddClient(clientID, r.RemoteAddr)
+	if err != nil {
+		http.Error(w, "Channel temporarily unavailable: "+err.Error(), http.StatusServiceUnavailable)
+		return
+	}
 	defer session.RemoveClient(clientID)
 
 	w.Header().Set("Content-Type", "video/MP2T")
@@ -685,7 +698,11 @@ func StreamRelayHLS(w http.ResponseWriter, r *http.Request) {
 	session := ffmpegManager.GetOrCreateFFmpegSession(sessionID, urls, "hls")
 
 	clientID := fmt.Sprintf("%x", md5.Sum([]byte(r.RemoteAddr+r.UserAgent())))
-	dataChan := session.AddClient(clientID, r.RemoteAddr)
+	dataChan, err := session.AddClient(clientID, r.RemoteAddr)
+	if err != nil {
+		http.Error(w, "Channel temporarily unavailable: "+err.Error(), http.StatusServiceUnavailable)
+		return
+	}
 	defer session.RemoveClient(clientID)
 
 	w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
@@ -881,7 +898,11 @@ func ProxyChannelHLS(w http.ResponseWriter, r *http.Request) {
 	session := ffmpegManager.GetOrCreateFFmpegSession(sessionID, []string{url}, "hls")
 
 	clientID := fmt.Sprintf("%x", md5.Sum([]byte(r.RemoteAddr+r.UserAgent())))
-	dataChan := session.AddClient(clientID, r.RemoteAddr)
+	dataChan, err := session.AddClient(clientID, r.RemoteAddr)
+	if err != nil {
+		http.Error(w, "Channel temporarily unavailable: "+err.Error(), http.StatusServiceUnavailable)
+		return
+	}
 	defer session.RemoveClient(clientID)
 
 	w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
@@ -965,4 +986,3 @@ func ServeUserPlaylist(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=playlist-%s.m3u", username))
 	http.ServeFile(w, r, filePath)
 }
-
