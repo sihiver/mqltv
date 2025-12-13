@@ -169,6 +169,23 @@ export const asyncRouterMap: AppRouteRecordRaw[] = [
     ]
   },
   {
+    path: '/settings',
+    component: Layout,
+    name: 'Settings',
+    meta: {},
+    children: [
+      {
+        path: 'index',
+        component: () => import('@/views/IPTV/Settings.vue'),
+        name: 'SystemSettings',
+        meta: {
+          title: 'Settings',
+          icon: 'vi-ep:setting'
+        }
+      }
+    ]
+  },
+  {
     path: '/import',
     component: Layout,
     name: 'Import',

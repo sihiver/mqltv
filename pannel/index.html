@@ -137,6 +137,38 @@
         </div>
       </div>
     </div>
+    <script>
+      // Load server name from backend for loading screen
+      (function() {
+        // Try to get from localStorage first
+        var savedTitle = localStorage.getItem('app_title')
+        if (savedTitle) {
+          var titleElements = document.querySelectorAll('.app-loading-title')
+          if (titleElements.length > 1) {
+            titleElements[1].textContent = savedTitle
+          }
+          document.title = savedTitle
+        }
+        
+        // Fetch from backend
+        fetch('/api/settings')
+          .then(function(response) { return response.json() })
+          .then(function(data) {
+            if (data && data.code === 0 && data.data && data.data.system && data.data.system.server_name) {
+              var title = data.data.system.server_name
+              var titleElements = document.querySelectorAll('.app-loading-title')
+              if (titleElements.length > 1) {
+                titleElements[1].textContent = title
+              }
+              document.title = title
+              localStorage.setItem('app_title', title)
+            }
+          })
+          .catch(function(error) {
+            console.log('Using default title')
+          })
+      })()
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

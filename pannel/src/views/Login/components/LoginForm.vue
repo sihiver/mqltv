@@ -17,8 +17,6 @@ import { BaseButton } from '@/components/Button'
 
 const { required } = useValidator()
 
-const emit = defineEmits(['to-register'])
-
 const appStore = useAppStore()
 
 const userStore = useUserStore()
@@ -93,9 +91,9 @@ const schema = reactive<FormSchema[]>([
           return (
             <>
               <div class="flex justify-between items-center w-[100%]">
-                <ElCheckbox v-model={remember.value} label={t('login.remember')} size="small" />
+                <ElCheckbox v-model={remember.value} label="Remember me" size="small" />
                 <ElLink type="primary" underline={false}>
-                  {t('login.forgetPassword')}
+                  Forgot password?
                 </ElLink>
               </div>
             </>
@@ -123,65 +121,6 @@ const schema = reactive<FormSchema[]>([
                 >
                   {t('login.login')}
                 </BaseButton>
-              </div>
-              <div class="w-[100%] mt-15px">
-                <BaseButton class="w-[100%]" onClick={toRegister}>
-                  {t('login.register')}
-                </BaseButton>
-              </div>
-            </>
-          )
-        }
-      }
-    }
-  },
-  {
-    field: 'other',
-    component: 'Divider',
-    label: t('login.otherLogin'),
-    componentProps: {
-      contentPosition: 'center'
-    }
-  },
-  {
-    field: 'otherIcon',
-    colProps: {
-      span: 24
-    },
-    formItemProps: {
-      slots: {
-        default: () => {
-          return (
-            <>
-              <div class="flex justify-between w-[100%]">
-                <Icon
-                  icon="vi-ant-design:github-filled"
-                  size={iconSize}
-                  class="cursor-pointer ant-icon"
-                  color={iconColor}
-                  hoverColor={hoverColor}
-                />
-                <Icon
-                  icon="vi-ant-design:wechat-filled"
-                  size={iconSize}
-                  class="cursor-pointer ant-icon"
-                  color={iconColor}
-                  hoverColor={hoverColor}
-                />
-                <Icon
-                  icon="vi-ant-design:alipay-circle-filled"
-                  size={iconSize}
-                  color={iconColor}
-                  hoverColor={hoverColor}
-                  class="cursor-pointer ant-icon"
-                />
-                <Icon
-                  icon="vi-ant-design:weibo-circle-filled"
-                  size={iconSize}
-                  color={iconColor}
-                  hoverColor={hoverColor}
-                  class="cursor-pointer ant-icon"
-                />
               </div>
             </>
           )
@@ -296,11 +235,6 @@ const getRole = async () => {
       : '/'
     push({ path: redirect.value || defaultPath })
   }
-}
-
-// 去注册页面
-const toRegister = () => {
-  emit('to-register')
 }
 </script>
 

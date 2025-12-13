@@ -22,6 +22,18 @@ func main() {
 	}
 	defer database.Close()
 
+	// Cleanup stale connections from previous server runs
+	result, err := database.DB.Exec(`
+		UPDATE user_connections 
+		SET disconnected_at = CURRENT_TIMESTAMP 
+		WHERE disconnected_at IS NULL
+	`)
+	if err == nil {
+		if rows, _ := result.RowsAffected(); rows > 0 {
+			log.Printf("🧹 Cleaned up %d stale connection(s) from previous session", rows)
+		}
+	}
+
 	// Setup router
 	r := mux.NewRouter()
 
@@ -45,10 +57,13 @@ func main() {
 	
 	// Auth (protected)
 	api.HandleFunc("/auth/change-password", handlers.ChangePassword).Methods("POST")
+	api.HandleFunc("/auth/profile", handlers.GetProfile).Methods("GET")
+	api.HandleFunc("/auth/update-profile", handlers.UpdateProfile).Methods("POST")
 	
 	// Stats
 	api.HandleFunc("/stats", handlers.GetStats).Methods("GET")
 	api.HandleFunc("/recently-watched", handlers.GetRecentlyWatchedChannels).Methods("GET")
+	api.HandleFunc("/active-channels", handlers.GetActiveChannelsWithViewers).Methods("GET")
 	
 	// Playlists
 	api.HandleFunc("/playlists", handlers.GetPlaylists).Methods("GET")
@@ -61,7 +76,9 @@ func main() {
 	
 	// Channels
 	api.HandleFunc("/channels", handlers.SearchChannels).Methods("GET")
+	api.HandleFunc("/channels", handlers.CreateChannel).Methods("POST")
 	api.HandleFunc("/channels/search", handlers.SearchChannels).Methods("GET")
+	api.HandleFunc("/channels/{id}", handlers.UpdateChannel).Methods("PUT")
 	api.HandleFunc("/channels/{id}/toggle", handlers.UpdateChannelStatus).Methods("POST")
 	api.HandleFunc("/channels/{id}", handlers.DeleteChannel).Methods("DELETE")
 	api.HandleFunc("/channels/batch-delete", handlers.BatchDeleteChannels).Methods("POST")
@@ -85,6 +102,12 @@ func main() {
 	api.HandleFunc("/users/{id}/connections", handlers.GetUserConnections).Methods("GET")
 	api.HandleFunc("/users/{id}/set-expired", handlers.SetUserExpired).Methods("POST")
 	api.HandleFunc("/users/{id}/extend", handlers.ExtendSubscription).Methods("POST")
+	
+	// Settings
+	api.HandleFunc("/settings", handlers.GetSettings).Methods("GET")
+	api.HandleFunc("/settings", handlers.UpdateSettings).Methods("POST")
+	api.HandleFunc("/settings/test-ffmpeg", handlers.TestFFmpeg).Methods("POST")
+	api.HandleFunc("/settings/clear-cache", handlers.ClearHLSCache).Methods("POST")
 	
 	// Generate playlist
 	api.HandleFunc("/generate-playlist", handlers.GenerateUserPlaylist).Methods("POST")

@@ -173,6 +173,10 @@ export const useAppStore = defineStore('app', {
     }
   },
   actions: {
+    setTitle(title: string) {
+      this.title = title
+      document.title = title
+    },
     setBreadcrumb(breadcrumb: boolean) {
       this.breadcrumb = breadcrumb
     },
@@ -230,9 +234,6 @@ export const useAppStore = defineStore('app', {
         return
       }
       this.layout = layout
-    },
-    setTitle(title: string) {
-      this.title = title
     },
     setIsDark(isDark: boolean) {
       this.isDark = isDark

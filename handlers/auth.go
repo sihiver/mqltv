@@ -172,8 +172,99 @@ func ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
+		"code":    0,
 		"message": "Password berhasil diubah",
+	})
+}
+
+// GetProfile returns current admin profile
+func GetProfile(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "admin-session")
+	adminID, ok := session.Values["admin_id"].(int)
+
+	if !ok {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"message": "Not authenticated",
+		})
+		return
+	}
+
+	var admin struct {
+		ID       int    `json:"id"`
+		Username string `json:"username"`
+		FullName string `json:"full_name"`
+		Email    string `json:"email"`
+	}
+
+	err := database.DB.QueryRow(
+		"SELECT id, username, COALESCE(full_name, ''), COALESCE(email, '') FROM admins WHERE id = ?",
+		adminID,
+	).Scan(&admin.ID, &admin.Username, &admin.FullName, &admin.Email)
+
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"message": "Failed to load profile",
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code": 0,
+		"data": admin,
+	})
+}
+
+// UpdateProfile updates admin profile (full_name, email)
+func UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "admin-session")
+	adminID, ok := session.Values["admin_id"].(int)
+
+	if !ok {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"message": "Not authenticated",
+		})
+		return
+	}
+
+	var req struct {
+		FullName string `json:"full_name"`
+		Email    string `json:"email"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"message": "Invalid request",
+		})
+		return
+	}
+
+	_, err := database.DB.Exec(
+		"UPDATE admins SET full_name = ?, email = ? WHERE id = ?",
+		req.FullName, req.Email, adminID,
+	)
+
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"message": "Failed to update profile",
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    0,
+		"message": "Profile updated successfully",
 	})
 }
 

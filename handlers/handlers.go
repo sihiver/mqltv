@@ -400,6 +400,33 @@ func StreamRelay(w http.ResponseWriter, r *http.Request) {
 	var urls []string
 	json.Unmarshal([]byte(sourceURLs), &urls)
 
+	// Get channel ID from relay path (format: channel-{id})
+	var channelID sql.NullInt64
+	if strings.HasPrefix(path, "channel-") {
+		if id, err := strconv.Atoi(strings.TrimPrefix(path, "channel-")); err == nil {
+			channelID = sql.NullInt64{Int64: int64(id), Valid: true}
+		}
+	}
+
+	// Track user connection
+	var connectionID int64
+	if channelID.Valid {
+		result, err := database.DB.Exec(`
+			INSERT INTO user_connections (user_id, channel_id, ip_address, connected_at) 
+			VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+		`, userID, channelID.Int64, r.RemoteAddr)
+		if err == nil {
+			connectionID, _ = result.LastInsertId()
+		}
+	}
+
+	// Defer closing connection
+	defer func() {
+		if connectionID > 0 {
+			database.DB.Exec("UPDATE user_connections SET disconnected_at = CURRENT_TIMESTAMP WHERE id = ?", connectionID)
+		}
+	}()
+
 	// Use FFmpeg manager for better compatibility and transcoding
 	ffmpegManager := streaming.GetFFmpegManager()
 	session := ffmpegManager.GetOrCreateFFmpegSession(path, urls, "mpegts")
@@ -697,6 +724,184 @@ func SearchChannels(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// CreateChannel creates a new channel
+func CreateChannel(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		PlaylistID int    `json:"playlist_id"`
+		Name       string `json:"name"`
+		URL        string `json:"url"`
+		Logo       string `json:"logo"`
+		GroupName  string `json:"group_name"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"message": "Invalid request: " + err.Error(),
+		})
+		return
+	}
+
+	if req.Name == "" || req.URL == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"message": "Name and URL are required",
+		})
+		return
+	}
+
+	result, err := database.DB.Exec(
+		"INSERT INTO channels (playlist_id, name, url, logo, group_name, active) VALUES (?, ?, ?, ?, ?, 1)",
+		req.PlaylistID, req.Name, req.URL, req.Logo, req.GroupName,
+	)
+	
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"message": "Failed to create channel: " + err.Error(),
+		})
+		return
+	}
+
+	channelID, _ := result.LastInsertId()
+
+	// Get the created channel with playlist info
+	var c models.Channel
+	var playlistName sql.NullString
+	err = database.DB.QueryRow(`
+		SELECT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at, p.name as playlist_name
+		FROM channels c
+		LEFT JOIN playlists p ON c.playlist_id = p.id
+		WHERE c.id = ?
+	`, channelID).Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, &c.Active, &c.CreatedAt, &playlistName)
+
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"message": "Channel created but failed to retrieve: " + err.Error(),
+		})
+		return
+	}
+
+	channel := map[string]interface{}{
+		"id":            c.ID,
+		"playlist_id":   c.PlaylistID,
+		"name":          c.Name,
+		"url":           c.URL,
+		"logo":          c.Logo,
+		"category":      c.Group,
+		"group_name":    c.Group,
+		"enabled":       c.Active,
+		"active":        c.Active,
+		"created_at":    c.CreatedAt,
+		"playlist_name": "",
+	}
+	
+	if playlistName.Valid {
+		channel["playlist_name"] = playlistName.String
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    0,
+		"data":    channel,
+		"message": "Channel created successfully",
+	})
+}
+
+// UpdateChannel updates an existing channel
+func UpdateChannel(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	channelID := vars["id"]
+
+	var req struct {
+		Name      string `json:"name"`
+		URL       string `json:"url"`
+		Logo      string `json:"logo"`
+		GroupName string `json:"group_name"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"message": "Invalid request: " + err.Error(),
+		})
+		return
+	}
+
+	if req.Name == "" || req.URL == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"message": "Name and URL are required",
+		})
+		return
+	}
+
+	_, err := database.DB.Exec(
+		"UPDATE channels SET name = ?, url = ?, logo = ?, group_name = ? WHERE id = ?",
+		req.Name, req.URL, req.Logo, req.GroupName, channelID,
+	)
+	
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"message": "Failed to update channel: " + err.Error(),
+		})
+		return
+	}
+
+	// Get the updated channel with playlist info
+	var c models.Channel
+	var playlistName sql.NullString
+	err = database.DB.QueryRow(`
+		SELECT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at, p.name as playlist_name
+		FROM channels c
+		LEFT JOIN playlists p ON c.playlist_id = p.id
+		WHERE c.id = ?
+	`, channelID).Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, &c.Active, &c.CreatedAt, &playlistName)
+
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"message": "Channel updated but failed to retrieve: " + err.Error(),
+		})
+		return
+	}
+
+	channel := map[string]interface{}{
+		"id":            c.ID,
+		"playlist_id":   c.PlaylistID,
+		"name":          c.Name,
+		"url":           c.URL,
+		"logo":          c.Logo,
+		"category":      c.Group,
+		"group_name":    c.Group,
+		"enabled":       c.Active,
+		"active":        c.Active,
+		"created_at":    c.CreatedAt,
+		"playlist_name": "",
+	}
+	
+	if playlistName.Valid {
+		channel["playlist_name"] = playlistName.String
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    0,
+		"data":    channel,
+		"message": "Channel updated successfully",
+	})
+}
+
 // GetStats returns dashboard statistics
 func GetStats(w http.ResponseWriter, r *http.Request) {
 	var stats struct {
@@ -708,7 +913,7 @@ func GetStats(w http.ResponseWriter, r *http.Request) {
 
 	database.DB.QueryRow("SELECT COUNT(*) FROM playlists").Scan(&stats.TotalPlaylists)
 	database.DB.QueryRow("SELECT COUNT(*) FROM channels").Scan(&stats.TotalChannels)
-	// Count channels being watched (have active connections)
+	// Count channels currently being watched (disconnected_at IS NULL)
 	database.DB.QueryRow(`
 		SELECT COUNT(DISTINCT channel_id) 
 		FROM user_connections 
@@ -727,45 +932,54 @@ func GetStats(w http.ResponseWriter, r *http.Request) {
 // GetRecentlyWatchedChannels returns channels that were recently watched by users
 func GetRecentlyWatchedChannels(w http.ResponseWriter, r *http.Request) {
 	rows, err := database.DB.Query(`
-		SELECT DISTINCT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at, p.name as playlist_name, MAX(uc.connected_at) as last_watched
+		SELECT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at, 
+		       p.name as playlist_name, MAX(uc.connected_at) as last_watched
 		FROM user_connections uc
 		INNER JOIN channels c ON uc.channel_id = c.id
 		LEFT JOIN playlists p ON c.playlist_id = p.id
 		WHERE uc.channel_id IS NOT NULL
-		GROUP BY c.id
+		GROUP BY c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at, p.name
 		ORDER BY last_watched DESC
 		LIMIT 10
 	`)
 	
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code": 1,
+			"data": nil,
+			"message": "Failed to load recently watched: " + err.Error(),
+		})
 		return
 	}
 	defer rows.Close()
 
 	var channels []map[string]interface{}
 	for rows.Next() {
-		var c models.Channel
+		var id, playlistID, active int
+		var name, url, logo, groupName string
+		var createdAt time.Time
 		var playlistName sql.NullString
-		var lastWatched time.Time
+		var lastWatchedStr string
 		
-		if err := rows.Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, &c.Active, &c.CreatedAt, &playlistName, &lastWatched); err != nil {
+		if err := rows.Scan(&id, &playlistID, &name, &url, &logo, &groupName, &active, &createdAt, &playlistName, &lastWatchedStr); err != nil {
+			log.Printf("Error scanning recently watched row: %v", err)
 			continue
 		}
 		
 		channel := map[string]interface{}{
-			"id":            c.ID,
-			"playlist_id":   c.PlaylistID,
-			"name":          c.Name,
-			"url":           c.URL,
-			"logo":          c.Logo,
-			"category":      c.Group,
-			"group_name":    c.Group,
-			"enabled":       c.Active,
-			"active":        c.Active,
-			"created_at":    c.CreatedAt,
+			"id":            id,
+			"playlist_id":   playlistID,
+			"name":          name,
+			"url":           url,
+			"logo":          logo,
+			"category":      groupName,
+			"group_name":    groupName,
+			"enabled":       active == 1,
+			"active":        active == 1,
+			"created_at":    createdAt,
 			"playlist_name": "",
-			"last_watched":  lastWatched,
+			"last_watched":  lastWatchedStr,
 		}
 		
 		if playlistName.Valid {
@@ -773,6 +987,82 @@ func GetRecentlyWatchedChannels(w http.ResponseWriter, r *http.Request) {
 		}
 		
 		channels = append(channels, channel)
+	}
+
+	// Return empty array instead of nil
+	if channels == nil {
+		channels = []map[string]interface{}{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code": 0,
+		"data": channels,
+	})
+}
+
+// GetActiveChannelsWithViewers returns currently active channels with viewer counts
+func GetActiveChannelsWithViewers(w http.ResponseWriter, r *http.Request) {
+	rows, err := database.DB.Query(`
+		SELECT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at,
+		       p.name as playlist_name, COUNT(uc.user_id) as viewer_count
+		FROM user_connections uc
+		INNER JOIN channels c ON uc.channel_id = c.id
+		LEFT JOIN playlists p ON c.playlist_id = p.id
+		WHERE uc.channel_id IS NOT NULL 
+		  AND uc.disconnected_at IS NULL
+		GROUP BY c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at, p.name
+		ORDER BY viewer_count DESC
+	`)
+	
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code": 1,
+			"data": nil,
+			"message": "Failed to load active channels: " + err.Error(),
+		})
+		return
+	}
+	defer rows.Close()
+
+	var channels []map[string]interface{}
+	for rows.Next() {
+		var id, playlistID, active, viewerCount int
+		var name, url, logo, groupName string
+		var createdAt time.Time
+		var playlistName sql.NullString
+		
+		if err := rows.Scan(&id, &playlistID, &name, &url, &logo, &groupName, &active, &createdAt, &playlistName, &viewerCount); err != nil {
+			log.Printf("Error scanning active channel row: %v", err)
+			continue
+		}
+		
+		channel := map[string]interface{}{
+			"id":            id,
+			"playlist_id":   playlistID,
+			"name":          name,
+			"url":           url,
+			"logo":          logo,
+			"category":      groupName,
+			"group_name":    groupName,
+			"enabled":       active == 1,
+			"active":        active == 1,
+			"created_at":    createdAt,
+			"playlist_name": "",
+			"viewer_count":  viewerCount,
+		}
+		
+		if playlistName.Valid {
+			channel["playlist_name"] = playlistName.String
+		}
+		
+		channels = append(channels, channel)
+	}
+
+	// Return empty array instead of nil
+	if channels == nil {
+		channels = []map[string]interface{}{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1052,18 +1342,32 @@ func GetStreamStatus(w http.ResponseWriter, r *http.Request) {
 	sessions := ffmpegManager.GetAllSessions()
 
 	status := make([]map[string]interface{}, 0, len(sessions))
+	var totalBytesRead uint64
+	var totalBytesWritten uint64
+	
 	for _, session := range sessions {
 		stats := session.GetStats()
 		// Only include active sessions with clients
 		if session.IsActive() && session.GetClientCount() > 0 {
 			status = append(status, stats)
+			if bytesRead, ok := stats["bytes_read"].(uint64); ok {
+				totalBytesRead += bytesRead
+			}
+			if bytesWritten, ok := stats["bytes_written"].(uint64); ok {
+				totalBytesWritten += bytesWritten
+			}
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"total_streams": len(status),
-		"streams":       status,
+		"code": 0,
+		"data": map[string]interface{}{
+			"total_streams":     len(status),
+			"streams":           status,
+			"total_bytes_read":  totalBytesRead,
+			"total_bytes_write": totalBytesWritten,
+		},
 	})
 }
 

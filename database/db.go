@@ -98,6 +98,13 @@ func createTables() error {
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			last_login DATETIME
 		)`,
+		`CREATE TABLE IF NOT EXISTS settings (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			key TEXT UNIQUE NOT NULL,
+			value TEXT NOT NULL,
+			category TEXT DEFAULT 'system',
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
 	}
 
 	for _, query := range queries {
@@ -108,6 +115,9 @@ func createTables() error {
 
 	// Create default admin if not exists
 	createDefaultAdmin()
+	
+	// Create default settings
+	createDefaultSettings()
 
 	log.Println("Database tables created successfully")
 	return nil
@@ -126,6 +136,44 @@ func createDefaultAdmin() {
 		)
 		if err == nil {
 			log.Println("✅ Default admin created - Username: admin, Password: admin123")
+		}
+	}
+}
+
+func createDefaultSettings() {
+	defaultSettings := map[string]map[string]string{
+		"system": {
+			"server_name":                "IPTV Panel",
+			"server_url":                 "http://localhost:8080",
+			"max_connections_per_user":   "3",
+			"session_timeout":            "3600",
+			"enable_user_registration":   "false",
+			"enable_relay_mode":          "true",
+		},
+		"ffmpeg": {
+			"ffmpeg_path":            "/usr/bin/ffmpeg",
+			"buffer_size":            "2048",
+			"idle_timeout":           "60",
+			"max_streams":            "100",
+			"enable_hls":             "true",
+			"hls_segment_duration":   "6",
+		},
+		"stream": {
+			"auto_start":         "true",
+			"auto_stop":          "true",
+			"max_bitrate":        "8000",
+			"enable_transcode":   "false",
+			"default_format":     "mpegts",
+		},
+	}
+
+	for category, settings := range defaultSettings {
+		for key, value := range settings {
+			var count int
+			DB.QueryRow("SELECT COUNT(*) FROM settings WHERE key = ?", key).Scan(&count)
+			if count == 0 {
+				DB.Exec("INSERT INTO settings (key, value, category) VALUES (?, ?, ?)", key, value, category)
+			}
 		}
 	}
 }

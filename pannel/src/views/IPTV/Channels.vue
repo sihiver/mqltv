@@ -12,13 +12,18 @@ import {
   ElOption,
   ElMessage,
   ElMessageBox,
-  ElPagination
+  ElPagination,
+  ElDialog,
+  ElForm,
+  ElFormItem
 } from 'element-plus'
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import request from '@/axios'
 
 const channels = ref([])
+const activeChannelIds = ref<Set<number>>(new Set())
 const categories = ref([])
+const playlists = ref([])
 const searchQuery = ref('')
 const selectedCategory = ref('')
 const selectedChannels = ref<Set<number>>(new Set())
@@ -27,6 +32,19 @@ const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const tableRef = ref()
+
+// Dialog state
+const dialogVisible = ref(false)
+const dialogTitle = ref('')
+const isEditing = ref(false)
+const formData = ref({
+  id: 0,
+  playlist_id: 0,
+  name: '',
+  url: '',
+  logo: '',
+  group_name: ''
+})
 
 // All filtered channels (before pagination)
 const allFilteredChannels = computed(() => {
@@ -163,6 +181,135 @@ const clearSelection = () => {
   }
 }
 
+const loadPlaylists = async () => {
+  try {
+    const res = await request.get({ url: '/api/playlists' })
+    if (res && res.data) {
+      playlists.value = res.data
+    }
+  } catch (error) {
+    console.error('Error loading playlists:', error)
+  }
+}
+
+const loadActiveChannels = async () => {
+  try {
+    const res = await request.get({ url: '/api/active-channels' })
+    if (res && Array.isArray(res.data)) {
+      activeChannelIds.value = new Set(res.data.map((ch: any) => ch.id))
+    }
+  } catch (error) {
+    console.error('Error loading active channels:', error)
+  }
+}
+
+const handleCreate = () => {
+  dialogTitle.value = 'Add New Channel'
+  isEditing.value = false
+  formData.value = {
+    id: 0,
+    playlist_id: playlists.value.length > 0 ? playlists.value[0].id : 0,
+    name: '',
+    url: '',
+    logo: '',
+    group_name: ''
+  }
+  dialogVisible.value = true
+}
+
+const handleEdit = (row: any) => {
+  dialogTitle.value = 'Edit Channel'
+  isEditing.value = true
+  formData.value = {
+    id: row.id,
+    playlist_id: row.playlist_id,
+    name: row.name,
+    url: row.url,
+    logo: row.logo,
+    group_name: row.category || ''
+  }
+  dialogVisible.value = true
+}
+
+const handleSave = async () => {
+  if (!formData.value.name || !formData.value.url) {
+    ElMessage.warning('Name and URL are required')
+    return
+  }
+
+  try {
+    if (isEditing.value) {
+      // Update existing channel
+      const res = await request.put({
+        url: `/api/channels/${formData.value.id}`,
+        data: {
+          name: formData.value.name,
+          url: formData.value.url,
+          logo: formData.value.logo,
+          group_name: formData.value.group_name
+        }
+      })
+      
+      // Update channel in list
+      const index = channels.value.findIndex((ch: any) => ch.id === formData.value.id)
+      if (index !== -1 && res.data) {
+        channels.value[index] = res.data
+      }
+      
+      ElMessage.success('Channel updated successfully')
+    } else {
+      // Create new channel
+      const res = await request.post({
+        url: '/api/channels',
+        data: {
+          playlist_id: formData.value.playlist_id,
+          name: formData.value.name,
+          url: formData.value.url,
+          logo: formData.value.logo,
+          group_name: formData.value.group_name
+        }
+      })
+      
+      // Add new channel to list
+      if (res.data) {
+        channels.value.unshift(res.data)
+        
+        // Update categories if new category
+        if (res.data.category && !categories.value.includes(res.data.category)) {
+          categories.value.push(res.data.category)
+        }
+      }
+      
+      ElMessage.success('Channel created successfully')
+    }
+    
+    dialogVisible.value = false
+  } catch (error) {
+    ElMessage.error(isEditing.value ? 'Failed to update channel' : 'Failed to create channel')
+  }
+}
+
+const handleDelete = async (row: any) => {
+  try {
+    await ElMessageBox.confirm(`Delete channel "${row.name}"?`, 'Confirm', {
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+      type: 'warning'
+    })
+
+    await request.delete({ url: `/api/channels/${row.id}` })
+
+    // Instant UI update
+    channels.value = channels.value.filter((ch: any) => ch.id !== row.id)
+
+    ElMessage.success('Channel deleted successfully')
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('Failed to delete channel')
+    }
+  }
+}
+
 const handleBatchDelete = async () => {
   if (selectedChannels.value.size === 0) return
 
@@ -192,8 +339,23 @@ const handleBatchDelete = async () => {
   }
 }
 
+let activeChannelsInterval: any = null
+
 onMounted(() => {
   loadChannels()
+  loadPlaylists()
+  loadActiveChannels()
+  
+  // Refresh active channels every 5 seconds
+  activeChannelsInterval = setInterval(() => {
+    loadActiveChannels()
+  }, 5000)
+})
+
+onUnmounted(() => {
+  if (activeChannelsInterval) {
+    clearInterval(activeChannelsInterval)
+  }
 })
 </script>
 
@@ -227,13 +389,9 @@ onMounted(() => {
 
       <ElCol :xs="24" :sm="24" :md="8">
         <div style="display: flex; gap: 8px; flex-wrap: wrap">
-          <ElButton @click="selectAllFiltered">
-            <Icon icon="ep:select" />
-            Select All ({{ total }})
-          </ElButton>
-          <ElButton @click="clearSelection" v-if="selectedChannels.size > 0">
-            <Icon icon="ep:close" />
-            Clear
+          <ElButton type="primary" @click="handleCreate">
+            <Icon icon="ep:plus" />
+            Add Channel
           </ElButton>
           <ElButton type="danger" :disabled="selectedChannels.size === 0" @click="handleBatchDelete">
             <Icon icon="ep:delete" />
@@ -275,24 +433,29 @@ onMounted(() => {
 
       <ElTableColumn prop="playlist_name" label="Playlist" width="150" />
 
-      <ElTableColumn label="Status" width="100">
+      <ElTableColumn label="Status" width="120">
         <template #default="{ row }">
-          <ElTag v-if="row.enabled" type="success">Active</ElTag>
-          <ElTag v-else type="info">Inactive</ElTag>
+          <ElTag v-if="activeChannelIds.has(row.id)" type="success">
+            <Icon icon="ep:video-play" style="margin-right: 4px" />
+            Streaming
+          </ElTag>
+          <ElTag v-else type="info">
+            <Icon icon="ep:video-pause" style="margin-right: 4px" />
+            Stopped
+          </ElTag>
+
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="Actions" width="220" fixed="right">
+      <ElTableColumn label="Actions" width="240" fixed="right">
         <template #default="{ row }">
-          <ElButton
-            :type="row.enabled ? 'warning' : 'success'"
-            size="small"
-            @click="toggleChannel(row)"
-          >
-            {{ row.enabled ? 'Disable' : 'Enable' }}
+          <ElButton type="primary" size="small" @click="handleEdit(row)">
+            <Icon icon="ep:edit" />
+            Edit
           </ElButton>
-          <ElButton type="danger" size="small" @click="deleteChannel(row)">
+          <ElButton type="danger" size="small" @click="handleDelete(row)">
             <Icon icon="ep:delete" />
+            Delete
           </ElButton>
         </template>
       </ElTableColumn>
@@ -310,5 +473,42 @@ onMounted(() => {
         @current-change="handlePageChange"
       />
     </div>
+
+    <!-- Create/Edit Dialog -->
+    <ElDialog v-model="dialogVisible" :title="dialogTitle" width="600px">
+      <ElForm :model="formData" label-width="120px">
+        <ElFormItem label="Playlist">
+          <ElSelect v-model="formData.playlist_id" placeholder="Select Playlist" style="width: 100%" :disabled="isEditing">
+            <ElOption
+              v-for="playlist in playlists"
+              :key="playlist.id"
+              :label="playlist.name"
+              :value="playlist.id"
+            />
+          </ElSelect>
+        </ElFormItem>
+        
+        <ElFormItem label="Channel Name" required>
+          <ElInput v-model="formData.name" placeholder="Enter channel name" />
+        </ElFormItem>
+
+        <ElFormItem label="URL" required>
+          <ElInput v-model="formData.url" placeholder="http://..." />
+        </ElFormItem>
+
+        <ElFormItem label="Logo URL">
+          <ElInput v-model="formData.logo" placeholder="http://..." />
+        </ElFormItem>
+
+        <ElFormItem label="Category">
+          <ElInput v-model="formData.group_name" placeholder="e.g., Sports, News, Entertainment" />
+        </ElFormItem>
+      </ElForm>
+
+      <template #footer>
+        <ElButton @click="dialogVisible = false">Cancel</ElButton>
+        <ElButton type="primary" @click="handleSave">Save</ElButton>
+      </template>
+    </ElDialog>
   </ContentWrap>
 </template>

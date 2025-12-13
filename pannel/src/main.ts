@@ -36,6 +36,22 @@ import App from './App.vue'
 
 import './permission'
 
+import axios from 'axios'
+
+// Load server name from backend
+const loadServerName = async () => {
+  try {
+    const response = await axios.get('/api/settings')
+    if (response.data && response.data.code === 0 && response.data.data?.system?.server_name) {
+      const title = response.data.data.system.server_name
+      document.title = title
+      localStorage.setItem('app_title', title)
+    }
+  } catch (error) {
+    console.log('Using default title')
+  }
+}
+
 // 创建实例
 const setupAll = async () => {
   const app = createApp(App)
@@ -43,6 +59,9 @@ const setupAll = async () => {
   await setupI18n(app)
 
   setupStore(app)
+
+  // Load server name early
+  await loadServerName()
 
   setupGlobCom(app)
 

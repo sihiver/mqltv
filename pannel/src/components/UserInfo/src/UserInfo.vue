@@ -2,6 +2,7 @@
 import { ElDropdown, ElDropdownMenu, ElDropdownItem } from 'element-plus'
 import { useI18n } from '@/hooks/web/useI18n'
 import { useDesign } from '@/hooks/web/useDesign'
+import { Icon } from '@/components/Icon'
 import LockDialog from './components/LockDialog.vue'
 import { ref, computed } from 'vue'
 import LockPage from './components/LockPage.vue'
@@ -34,12 +35,12 @@ const lockScreen = () => {
   dialogVisible.value = true
 }
 
-const toDocument = () => {
-  window.open('https://element-plus-admin-doc.cn/')
+const toSettings = () => {
+  push('/settings/index')
 }
 
-const toPage = (path: string) => {
-  push(path)
+const toDashboard = () => {
+  push('/dashboard/index')
 }
 </script>
 
@@ -58,18 +59,22 @@ const toPage = (path: string) => {
     <template #dropdown>
       <ElDropdownMenu>
         <ElDropdownItem>
-          <div @click="toPage('/personal/personal-center')">
-            {{ t('router.personalCenter') }}
+          <div @click="toDashboard">
+            <Icon icon="ep:data-analysis" class="mr-2" />
+            Dashboard
           </div>
         </ElDropdownItem>
         <ElDropdownItem>
-          <div @click="toDocument">{{ t('common.document') }}</div>
+          <div @click="toSettings">
+            <Icon icon="ep:setting" class="mr-2" />
+            Settings
+          </div>
         </ElDropdownItem>
         <ElDropdownItem divided>
-          <div @click="lockScreen">{{ t('lock.lockScreen') }}</div>
-        </ElDropdownItem>
-        <ElDropdownItem>
-          <div @click="loginOut">{{ t('common.loginOut') }}</div>
+          <div @click="loginOut">
+            <Icon icon="ep:switch-button" class="mr-2" />
+            Logout
+          </div>
         </ElDropdownItem>
       </ElDropdownMenu>
     </template>
