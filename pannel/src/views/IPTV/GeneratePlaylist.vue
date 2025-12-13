@@ -46,7 +46,7 @@ const loadChannels = async () => {
     const res = await request.get({ url: '/api/channels/search', params: { q: '' } })
     if (res && res.data) {
       channels.value = res.data
-      
+
       // Extract categories
       const cats = new Set<string>()
       channels.value.forEach((ch: any) => {
@@ -175,7 +175,7 @@ onMounted(() => {
               </span>
             </div>
           </div>
-          
+
           <ElTransfer
             v-model="selectedChannels"
             :data="transferData"
