@@ -17,7 +17,7 @@ import {
   ElForm,
   ElFormItem
 } from 'element-plus'
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watchEffect, watch } from 'vue'
 import request from '@/axios'
 
 const channels = ref([])
@@ -63,7 +63,6 @@ const allFilteredChannels = computed(() => {
     result = result.filter((ch: any) => ch.category === selectedCategory.value)
   }
 
-  total.value = result.length
   return result
 })
 
@@ -73,6 +72,11 @@ const filteredChannels = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
   return result.slice(start, end)
+})
+
+// Update total reactively
+watchEffect(() => {
+  total.value = allFilteredChannels.value.length
 })
 
 const handlePageChange = (page: number) => {
@@ -90,7 +94,7 @@ const handleSizeChange = (size: number) => {
 // Sync table visual selection with selectedChannels Set
 const syncTableSelection = () => {
   if (!tableRef.value) return
-  
+
   setTimeout(() => {
     filteredChannels.value.forEach((ch: any) => {
       const isSelected = selectedChannels.value.has(ch.id)
@@ -249,13 +253,13 @@ const handleSave = async () => {
           group_name: formData.value.group_name
         }
       })
-      
+
       // Update channel in list
       const index = channels.value.findIndex((ch: any) => ch.id === formData.value.id)
       if (index !== -1 && res.data) {
         channels.value[index] = res.data
       }
-      
+
       ElMessage.success('Channel updated successfully')
     } else {
       // Create new channel
@@ -269,20 +273,20 @@ const handleSave = async () => {
           group_name: formData.value.group_name
         }
       })
-      
+
       // Add new channel to list
       if (res.data) {
         channels.value.unshift(res.data)
-        
+
         // Update categories if new category
         if (res.data.category && !categories.value.includes(res.data.category)) {
           categories.value.push(res.data.category)
         }
       }
-      
+
       ElMessage.success('Channel created successfully')
     }
-    
+
     dialogVisible.value = false
   } catch (error) {
     ElMessage.error(isEditing.value ? 'Failed to update channel' : 'Failed to create channel')
@@ -345,7 +349,7 @@ onMounted(() => {
   loadChannels()
   loadPlaylists()
   loadActiveChannels()
-  
+
   // Refresh active channels every 5 seconds
   activeChannelsInterval = setInterval(() => {
     loadActiveChannels()
@@ -393,7 +397,11 @@ onUnmounted(() => {
             <Icon icon="ep:plus" />
             Add Channel
           </ElButton>
-          <ElButton type="danger" :disabled="selectedChannels.size === 0" @click="handleBatchDelete">
+          <ElButton
+            type="danger"
+            :disabled="selectedChannels.size === 0"
+            @click="handleBatchDelete"
+          >
             <Icon icon="ep:delete" />
             Delete ({{ selectedChannels.size }})
           </ElButton>
@@ -443,7 +451,6 @@ onUnmounted(() => {
             <Icon icon="ep:video-pause" style="margin-right: 4px" />
             Stopped
           </ElTag>
-
         </template>
       </ElTableColumn>
 
@@ -478,7 +485,12 @@ onUnmounted(() => {
     <ElDialog v-model="dialogVisible" :title="dialogTitle" width="600px">
       <ElForm :model="formData" label-width="120px">
         <ElFormItem label="Playlist">
-          <ElSelect v-model="formData.playlist_id" placeholder="Select Playlist" style="width: 100%" :disabled="isEditing">
+          <ElSelect
+            v-model="formData.playlist_id"
+            placeholder="Select Playlist"
+            style="width: 100%"
+            :disabled="isEditing"
+          >
             <ElOption
               v-for="playlist in playlists"
               :key="playlist.id"
@@ -487,7 +499,7 @@ onUnmounted(() => {
             />
           </ElSelect>
         </ElFormItem>
-        
+
         <ElFormItem label="Channel Name" required>
           <ElInput v-model="formData.name" placeholder="Enter channel name" />
         </ElFormItem>

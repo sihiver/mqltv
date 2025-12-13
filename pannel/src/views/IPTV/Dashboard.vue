@@ -84,13 +84,13 @@ const loadBandwidth = async () => {
       }
 
       // Update chart data
-      const currentTime = new Date().toLocaleTimeString('en-US', { 
-        hour12: false, 
-        hour: '2-digit', 
-        minute: '2-digit', 
-        second: '2-digit' 
+      const currentTime = new Date().toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
       })
-      
+
       timeLabels.value.push(currentTime)
       downloadData.value.push(parseFloat(downloadRate.toFixed(2)))
       uploadData.value.push(parseFloat(uploadRate.toFixed(2)))
@@ -353,23 +353,23 @@ onUnmounted(() => {
           <span>Bandwidth Monitor</span>
         </div>
       </template>
-      
+
       <!-- Real-time Chart -->
       <div id="bandwidthChart" style="width: 100%; height: 300px; margin-bottom: 20px"></div>
-      
+
       <!-- Statistics -->
       <ElRow :gutter="15">
         <ElCol :xs="12" :sm="6">
           <ElStatistic title="Download (Mbps)" :value="bandwidth.downloadMbps" :precision="2">
             <template #prefix>
-              <Icon icon="ep:download" style="color: #67C23A" />
+              <Icon icon="ep:download" style="color: #67c23a" />
             </template>
           </ElStatistic>
         </ElCol>
         <ElCol :xs="12" :sm="6">
           <ElStatistic title="Upload (Mbps)" :value="bandwidth.uploadMbps" :precision="2">
             <template #prefix>
-              <Icon icon="ep:upload" style="color: #409EFF" />
+              <Icon icon="ep:upload" style="color: #409eff" />
             </template>
           </ElStatistic>
         </ElCol>

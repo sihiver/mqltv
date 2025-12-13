@@ -78,9 +78,7 @@ const refreshPlaylist = async (id: number, name: string) => {
 
     loading.value = true
     const res = await request.post({ url: `/api/playlists/${id}/refresh` })
-    ElMessage.success(
-      `Playlist refreshed! ${res.data?.channels_count || 0} channels updated`
-    )
+    ElMessage.success(`Playlist refreshed! ${res.data?.channels_count || 0} channels updated`)
     loadPlaylists()
   } catch (error: any) {
     if (error !== 'cancel') {
@@ -101,10 +99,10 @@ const deletePlaylist = async (id: number, name: string) => {
 
     loading.value = true
     await request.delete({ url: `/api/playlists/${id}` })
-    
+
     // Remove from local array immediately
     playlists.value = playlists.value.filter((p: any) => p.id !== id)
-    
+
     ElMessage.success('Playlist deleted successfully')
   } catch (error: any) {
     if (error !== 'cancel') {

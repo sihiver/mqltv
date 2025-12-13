@@ -57,15 +57,15 @@ const createUser = async () => {
 
   try {
     const res = await request.post({ url: '/api/users', data: userForm })
-    
+
     // Add new user to the list instantly
     if (res && res.data) {
       users.value.unshift(res.data)
     }
-    
+
     ElMessage.success('User created successfully')
     showCreateDialog.value = false
-    
+
     // Reset form
     userForm.username = ''
     userForm.password = ''
