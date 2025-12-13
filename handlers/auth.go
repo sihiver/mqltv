@@ -283,37 +283,27 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// StaticAuthMiddleware protects static HTML files only
+// StaticAuthMiddleware for Vue SPA - serves index.html for all routes
 func StaticAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		
-		// Allow public files
-		if path == "/login.html" || 
-		   path == "/styles.css" || 
-		   path == "/app.js" ||
-		   path == "/playlist.js" ||
-		   path == "/channels.js" ||
-		   path == "/bandwidth.js" ||
-		   path == "/relay.js" ||
-		   path == "/users.js" ||
-		   path == "/generate-playlist.js" ||
-		   path == "/expired-notification.mp4" {
+		// Allow all static assets (js, css, images, fonts)
+		if len(path) > 1 && (
+			// Asset directories
+			len(path) > 7 && path[:7] == "/assets" ||
+			// Static files
+			path == "/favicon.ico" ||
+			path == "/logo.png" ||
+			path == "/clear-storage.html" ||
+			// Legacy support for old panel
+			path == "/expired.html") {
 			next.ServeHTTP(w, r)
 			return
 		}
 		
-		// For HTML files (including /), check auth
-		if path == "/" || path == "/index.html" || path == "/index-new.html" {
-			session, _ := store.Get(r, "admin-session")
-			loggedIn, ok := session.Values["logged_in"].(bool)
-			
-			if !ok || !loggedIn {
-				http.Redirect(w, r, "/login.html", http.StatusFound)
-				return
-			}
-		}
-		
+		// For root path and all other routes, serve index.html (Vue SPA handles routing)
+		// Vue router will handle /login, /dashboard, etc.
 		next.ServeHTTP(w, r)
 	})
 }

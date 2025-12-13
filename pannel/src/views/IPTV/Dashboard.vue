@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ContentWrap } from '@/components/ContentWrap'
+import { Icon } from '@/components/Icon'
 import { ElRow, ElCol, ElCard, ElStatistic, ElTable, ElTableColumn, ElTag } from 'element-plus'
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import request from '@/axios'
@@ -68,6 +69,15 @@ const loadBandwidth = async () => {
       const bytesRead = res.data.total_bytes_read || 0
       const bytesWritten = res.data.total_bytes_write || 0
       const now = Date.now()
+
+      // Initialize on first run
+      if (prevBytesRead === 0 && prevBytesWritten === 0) {
+        prevBytesRead = bytesRead
+        prevBytesWritten = bytesWritten
+        prevTimestamp = now
+        // Don't update chart on first run, just initialize
+        return
+      }
 
       // Calculate rates (Mbps = megabits per second)
       const timeDelta = (now - prevTimestamp) / 1000 // seconds

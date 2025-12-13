@@ -11,7 +11,8 @@ const abortControllerMap: Map<string, AbortController> = new Map()
 
 const axiosInstance: AxiosInstance = axios.create({
   timeout: REQUEST_TIMEOUT,
-  baseURL: PATH_URL
+  baseURL: PATH_URL,
+  withCredentials: true // Send cookies with requests for session auth
 })
 
 axiosInstance.interceptors.request.use((res: InternalAxiosRequestConfig) => {
@@ -33,8 +34,26 @@ axiosInstance.interceptors.response.use(
     return res
   },
   (error: AxiosError) => {
-    console.log('err： ' + error) // for debug
-    ElMessage.error(error.message)
+    // Handle network errors safely
+    if (error.response) {
+      // Server responded with error status
+      const status = error.response.status
+      if (status === 401) {
+        // Handle unauthorized
+        ElMessage.error('Authentication failed')
+      } else if (status === 404) {
+        ElMessage.error('Resource not found')
+      } else {
+        ElMessage.error(error.response.data?.message || error.message || 'Request failed')
+      }
+    } else if (error.request) {
+      // Request made but no response (network error)
+      console.warn('Network error:', error.message)
+      // Don't show error message for network errors (might be browser extension interference)
+    } else {
+      // Something else happened
+      ElMessage.error(error.message || 'Request failed')
+    }
     return Promise.reject(error)
   }
 )

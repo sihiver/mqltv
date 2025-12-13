@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ContentWrap } from '@/components/ContentWrap'
+import { Icon } from '@iconify/vue'
 import {
   ElTable,
   ElTableColumn,

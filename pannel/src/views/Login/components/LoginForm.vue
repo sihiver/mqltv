@@ -61,11 +61,13 @@ const schema = reactive<FormSchema[]>([
     field: 'password',
     label: t('login.password'),
     // value: 'admin',
-    component: 'InputPassword',
+    component: 'Input',
     colProps: {
       span: 24
     },
     componentProps: {
+      type: 'password',
+      showPassword: true,
       style: {
         width: '100%'
       },
@@ -191,8 +193,7 @@ const signIn = async () => {
               addRoute(route as RouteRecordRaw) // 动态添加可访问路由表
             })
             permissionStore.setIsAddRouters(true)
-            const defaultPath = '/dashboard/index'
-            push({ path: redirect.value || defaultPath })
+            push({ path: redirect.value || '/dashboard/index' })
           }
         }
       } finally {
@@ -223,10 +224,7 @@ const getRole = async () => {
       addRoute(route as RouteRecordRaw) // 动态添加可访问路由表
     })
     permissionStore.setIsAddRouters(true)
-    const defaultPath = permissionStore.getAddRouters[0]?.children?.[0]?.path
-      ? `/dashboard/index`
-      : '/'
-    push({ path: redirect.value || defaultPath })
+    push({ path: redirect.value || '/dashboard/index' })
   }
 }
 </script>

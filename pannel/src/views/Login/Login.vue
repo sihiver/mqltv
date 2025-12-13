@@ -63,9 +63,7 @@ const { t } = useI18n()
             <div
               class="h-full flex items-center m-auto w-[100%] at-2xl:max-w-500px at-xl:max-w-500px at-md:max-w-500px at-lg:max-w-500px"
             >
-              <LoginForm
-                class="p-20px h-auto m-auto lt-xl:rounded-3xl lt-xl:light:bg-white"
-              />
+              <LoginForm class="p-20px h-auto m-auto lt-xl:rounded-3xl lt-xl:light:bg-white" />
             </div>
           </Transition>
         </div>

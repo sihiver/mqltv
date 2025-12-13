@@ -41,7 +41,7 @@ import axios from 'axios'
 // Load server name from backend
 const loadServerName = async () => {
   try {
-    const response = await axios.get('/api/settings')
+    const response = await axios.get('/api/settings', { withCredentials: true })
     if (response.data && response.data.code === 0 && response.data.data?.system?.server_name) {
       const title = response.data.data.system.server_name
       document.title = title

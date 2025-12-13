@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ContentWrap } from '@/components/ContentWrap'
+import { Icon } from '@iconify/vue'
 import {
   ElTable,
   ElTableColumn,
@@ -89,7 +90,9 @@ onMounted(() => {
 <template>
   <ContentWrap title="Relays" message="Manage stream relays">
     <ElButton type="primary" @click="showCreateDialog = true" style="margin-bottom: 16px">
-      <Icon icon="ep:plus" />
+      <template #icon>
+        <Icon icon="ep:plus" />
+      </template>
       Create New Relay
     </ElButton>
 
@@ -108,11 +111,15 @@ onMounted(() => {
       <ElTableColumn label="Actions" width="200" fixed="right">
         <template #default="{ row }">
           <ElButton type="primary" size="small" text @click="copyRelayURL(row)">
-            <Icon icon="ep:document-copy" />
+            <template #icon>
+              <Icon icon="ep:document-copy" />
+            </template>
             Copy URL
           </ElButton>
           <ElButton type="danger" size="small" @click="deleteRelay(row)">
-            <Icon icon="ep:delete" />
+            <template #icon>
+              <Icon icon="ep:delete" />
+            </template>
           </ElButton>
         </template>
       </ElTableColumn>

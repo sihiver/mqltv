@@ -56,7 +56,7 @@ watch(
         layout !== 'classic' ? `${prefixCls}__Top` : '',
         'flex !h-[var(--logo-height)] items-center cursor-pointer pl-8px relative decoration-none overflow-hidden'
       ]"
-      to="/"
+      to="/dashboard/index"
     >
       <img
         src="@/assets/imgs/logo.png"

@@ -37,6 +37,24 @@ func main() {
 	// Setup router
 	r := mux.NewRouter()
 
+	// CORS middleware for all routes
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4000")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			
+			// Handle preflight
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			
+			next.ServeHTTP(w, r)
+		})
+	})
+
 	// Auth routes (public)
 	r.HandleFunc("/api/auth/login", handlers.Login).Methods("POST")
 	r.HandleFunc("/api/auth/logout", handlers.Logout).Methods("POST")
@@ -126,8 +144,8 @@ func main() {
 	// Serve generated playlists (legacy support)
 	r.PathPrefix("/generated_playlists/").Handler(http.StripPrefix("/generated_playlists/", http.FileServer(http.Dir("./generated_playlists"))))
 	
-	// Serve static files with auth middleware
-	r.PathPrefix("/").Handler(handlers.StaticAuthMiddleware(http.FileServer(http.Dir("./static"))))
+	// Serve Vue panel static files (production build)
+	r.PathPrefix("/").Handler(handlers.StaticAuthMiddleware(http.FileServer(http.Dir("./pannel/dist-pro"))))
 
 	// Get port from environment or use default
 	port := os.Getenv("PORT")

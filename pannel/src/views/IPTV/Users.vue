@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ContentWrap } from '@/components/ContentWrap'
+import { Icon } from '@iconify/vue'
 import {
   ElTable,
   ElTableColumn,
@@ -178,7 +179,9 @@ onMounted(() => {
 <template>
   <ContentWrap title="Users" message="Manage user accounts and subscriptions">
     <ElButton type="primary" @click="showCreateDialog = true" style="margin-bottom: 16px">
-      <Icon icon="ep:plus" />
+      <template #icon>
+        <Icon icon="ep:plus" />
+      </template>
       Create New User
     </ElButton>
 
@@ -208,15 +211,21 @@ onMounted(() => {
       <ElTableColumn label="Actions" width="300" fixed="right">
         <template #default="{ row }">
           <ElButton type="primary" size="small" text @click="openExtendDialog(row)">
-            <Icon icon="ep:calendar" />
+            <template #icon>
+              <Icon icon="ep:calendar" />
+            </template>
             Extend
           </ElButton>
           <ElButton type="warning" size="small" text @click="resetPassword(row)">
-            <Icon icon="ep:lock" />
+            <template #icon>
+              <Icon icon="ep:lock" />
+            </template>
             Reset
           </ElButton>
           <ElButton type="danger" size="small" @click="deleteUser(row)">
-            <Icon icon="ep:delete" />
+            <template #icon>
+              <Icon icon="ep:delete" />
+            </template>
           </ElButton>
         </template>
       </ElTableColumn>
