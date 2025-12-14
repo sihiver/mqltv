@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"iptv-panel/database"
 	"iptv-panel/models"
 	"iptv-panel/parser"
@@ -1547,3 +1548,63 @@ func ServeUserPlaylist(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=playlist-%s.m3u", username))
 	http.ServeFile(w, r, filePath)
 }
+
+// AdminPreviewChannel - Admin preview tanpa user authentication
+func AdminPreviewChannel(w http.ResponseWriter, r *http.Request) {
+	// Get channel ID
+	vars := mux.Vars(r)
+	channelIDStr := vars["id"]
+	channelID, err := strconv.Atoi(channelIDStr)
+	if err != nil {
+		http.Error(w, "Invalid channel ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get channel info
+	var sourceURL string
+	err = database.DB.QueryRow("SELECT url FROM channels WHERE id = ?", channelID).Scan(&sourceURL)
+	if err != nil {
+		http.Error(w, "Channel not found", http.StatusNotFound)
+		return
+	}
+
+	// Set CORS headers
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	// Proxy the stream directly
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse // Don't follow redirects
+		},
+	}
+
+	req, err := http.NewRequest("GET", sourceURL, nil)
+	if err != nil {
+		http.Error(w, "Failed to create request", http.StatusInternalServerError)
+		return
+	}
+
+	// Copy headers from original request
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, "Failed to fetch stream", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Copy response headers
+	for k, v := range resp.Header {
+		w.Header()[k] = v
+	}
+	w.WriteHeader(resp.StatusCode)
+
+	// Stream the content
+	io.Copy(w, resp.Body)
+}
+
+// AdminPreviewChannel allows admin to preview channel without user auth

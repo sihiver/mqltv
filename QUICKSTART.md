@@ -210,6 +210,9 @@ ExecStart=/home/dindin/mqltv/iptv-panel
 Restart=always
 Environment="PORT=8080"
 Environment="DB_PATH=/home/dindin/mqltv/iptv.db"
+Environment="HOST=YOUR_VPS_IP:8080"
+# Ganti YOUR_VPS_IP dengan IP publik VPS (contoh: 203.0.113.10:8080)
+# Atau gunakan domain: Environment="HOST=iptv.yourdomain.com"
 
 [Install]
 WantedBy=multi-user.target

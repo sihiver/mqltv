@@ -18,8 +18,9 @@ import {
   ElForm,
   ElFormItem
 } from 'element-plus'
-import { ref, computed, onMounted, onUnmounted, watchEffect, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watchEffect, watch, nextTick } from 'vue'
 import request from '@/axios'
+import Hls from 'hls.js'
 
 const channels = ref([])
 const activeChannelIds = ref<Set<number>>(new Set())
@@ -46,6 +47,13 @@ const formData = ref({
   logo: '',
   group_name: ''
 })
+
+// Playback dialog state
+const playbackDialogVisible = ref(false)
+const playbackChannel = ref<any>(null)
+const playbackUrl = ref('')
+const videoRef = ref<HTMLVideoElement | null>(null)
+let hls: Hls | null = null
 
 // All filtered channels (before pagination)
 const allFilteredChannels = computed(() => {
@@ -236,6 +244,112 @@ const handleEdit = (row: any) => {
   dialogVisible.value = true
 }
 
+const handlePlayback = (row: any) => {
+  playbackChannel.value = row
+  // Use direct source URL instead of preview endpoint
+  playbackUrl.value = row.url
+  playbackDialogVisible.value = true
+  
+  // Initialize HLS player after dialog opens
+  nextTick(() => {
+    initPlayer()
+  })
+}
+
+const initPlayer = () => {
+  const video = videoRef.value
+  if (!video) return
+
+  // Clean up existing HLS instance
+  if (hls) {
+    hls.destroy()
+    hls = null
+  }
+
+  const streamUrl = playbackUrl.value
+  const isHLS = streamUrl.includes('.m3u8') || streamUrl.includes('m3u8')
+
+  if (isHLS && Hls.isSupported()) {
+    hls = new Hls({
+      enableWorker: true,
+      lowLatencyMode: true,
+      backBufferLength: 90,
+      xhrSetup: function (xhr) {
+        xhr.withCredentials = false
+      }
+    })
+    
+    hls.loadSource(streamUrl)
+    hls.attachMedia(video)
+    
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      video.play().catch((err) => {
+        console.warn('Autoplay failed:', err)
+      })
+    })
+    
+    hls.on(Hls.Events.ERROR, (event, data) => {
+      console.error('HLS error:', data)
+      if (data.fatal) {
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            ElMessage.warning('Network error - trying native player')
+            // Fallback to native player
+            if (hls) {
+              hls.destroy()
+              hls = null
+            }
+            video.src = streamUrl
+            video.play().catch(() => {
+              ElMessage.error('Playback failed - stream may be unavailable')
+            })
+            break
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            ElMessage.error('Media error: Trying to recover')
+            hls?.recoverMediaError()
+            break
+          default:
+            ElMessage.error('Fatal error: Cannot play stream')
+            hls?.destroy()
+            break
+        }
+      }
+    })
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    // Native HLS support (Safari)
+    video.src = streamUrl
+    video.addEventListener('loadedmetadata', () => {
+      video.play().catch((err) => {
+        console.warn('Autoplay failed:', err)
+      })
+    })
+  } else {
+    // For non-HLS streams or browsers without HLS support, use native player
+    video.src = streamUrl
+    video.play().catch((err) => {
+      ElMessage.error('Playback failed: ' + err.message)
+    })
+  }
+}
+
+const closePlayback = () => {
+  // Stop and destroy HLS instance
+  if (hls) {
+    hls.destroy()
+    hls = null
+  }
+  
+  // Reset video element
+  if (videoRef.value) {
+    videoRef.value.pause()
+    videoRef.value.src = ''
+  }
+  
+  playbackDialogVisible.value = false
+  playbackChannel.value = null
+  playbackUrl.value = ''
+}
+
 const handleSave = async () => {
   if (!formData.value.name || !formData.value.url) {
     ElMessage.warning('Name and URL are required')
@@ -361,6 +475,12 @@ onUnmounted(() => {
   if (activeChannelsInterval) {
     clearInterval(activeChannelsInterval)
   }
+  
+  // Cleanup HLS instance
+  if (hls) {
+    hls.destroy()
+    hls = null
+  }
 })
 </script>
 
@@ -455,8 +575,12 @@ onUnmounted(() => {
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="Actions" width="240" fixed="right">
+      <ElTableColumn label="Actions" width="300" fixed="right">
         <template #default="{ row }">
+          <ElButton type="success" size="small" @click="handlePlayback(row)">
+            <Icon icon="ep:video-play" />
+            Play
+          </ElButton>
           <ElButton type="primary" size="small" @click="handleEdit(row)">
             <Icon icon="ep:edit" />
             Edit
@@ -521,6 +645,60 @@ onUnmounted(() => {
       <template #footer>
         <ElButton @click="dialogVisible = false">Cancel</ElButton>
         <ElButton type="primary" @click="handleSave">Save</ElButton>
+      </template>
+    </ElDialog>
+
+    <!-- Playback Dialog -->
+    <ElDialog
+      v-model="playbackDialogVisible"
+      :title="playbackChannel?.name || 'Channel Playback'"
+      width="900px"
+      @close="closePlayback"
+    >
+      <div v-if="playbackChannel">
+        <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 12px">
+          <img
+            v-if="playbackChannel.logo"
+            :src="playbackChannel.logo"
+            :alt="playbackChannel.name"
+            style="width: 64px; height: 64px; object-fit: contain; border-radius: 8px"
+          />
+          <div>
+            <div style="font-size: 18px; font-weight: 600">{{ playbackChannel.name }}</div>
+            <div style="font-size: 14px; color: #909399">
+              {{ playbackChannel.category || 'Uncategorized' }}
+            </div>
+          </div>
+        </div>
+
+        <div
+          style="
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            max-height: 500px;
+          "
+        >
+          <video
+            ref="videoRef"
+            controls
+            style="width: 100%; height: 100%; object-fit: contain"
+          >
+            Your browser does not support the video tag.
+          </video>
+        </div>
+
+        <div style="margin-top: 16px; font-size: 12px; color: #909399">
+          <strong>Stream URL:</strong>
+          <code style="padding: 4px 8px; background: #f5f5f5; border-radius: 4px; margin-left: 8px">
+            {{ playbackUrl }}
+          </code>
+        </div>
+      </div>
+
+      <template #footer>
+        <ElButton @click="closePlayback">Close</ElButton>
       </template>
     </ElDialog>
   </ContentWrap>

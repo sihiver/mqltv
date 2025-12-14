@@ -1,45 +1,115 @@
 #EXTM3U
-#EXTINF:-1 tvg-id="18439" tvg-name="ANTV" tvg-logo="https://thumbor.prod.vidiocdn.com/45W5WeEJJyd4q_kNCsZBsDZvf1Q=/filters:strip_icc():quality(70)/vidio-web-prod-user/uploads/user/avatar/88855596/PROFILETVONE-ad494997ef15cf6d.jpg" group-title="LOKAL INDONESIA™",ANTV
-http://localhost:8080/stream/channel-18439?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18445" tvg-name="Bali TV" tvg-logo="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQCi6fPl9htPxqaE1f2B9hZK9TXm6LrYPEEgA&s" group-title="LOKAL INDONESIA™",Bali TV
-http://localhost:8080/stream/channel-18445?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18429" tvg-name="GTV" tvg-logo="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT-EehM8fz1VW8hKyeTEjD1aPc9Fu3RpH67Eg&s" group-title="LOKAL INDONESIA™",GTV
-http://localhost:8080/stream/channel-18429?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18624" tvg-name="Indosiar" tvg-logo="http://goldenid.online:80/images/MuJ8fbAi_MkdxEgTx4Ih-1gLaqcgSkbejhA1LVB8e8ukTkzUhrsjswTPB9d3zJRiGhNQG7YekYBbrFJ5ec_pvw.png" group-title="LOKAL INDONESIA™",Indosiar
-http://localhost:8080/stream/channel-18624?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18433" tvg-name="Indosiar (Sport)" tvg-logo="http://goldenid.online:80/images/MuJ8fbAi_MkdxEgTx4Ih-1gLaqcgSkbejhA1LVB8e8ukTkzUhrsjswTPB9d3zJRiGhNQG7YekYBbrFJ5ec_pvw.png" group-title="LOKAL INDONESIA™",Indosiar (Sport)
-http://localhost:8080/stream/channel-18433?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18437" tvg-name="Kompas tv" tvg-logo="http://goldenid.online:80/images/KAts4CTlAHmisT2eFggVHj-jUikG-UwFiElWbJow-nhdIXVGCRET5gc68B_8WaQbmHjYXuyuSZzAYWIskIQTYMeZyXzJB_M4E3Ah6Pk3O14xqfOgB33cp24-NITHtsI5ncMPZ3Et7TdHj584PjEsyK5j6UHWNiut4zPiDNL1cvp9FIXvUkE205Kke87TwTiz.jpg" group-title="LOKAL INDONESIA™",Kompas tv
-http://localhost:8080/stream/channel-18437?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18441" tvg-name="METRO TV HD" tvg-logo="http://goldenid.online:80/images/c2UotlQ1L6lyEyZz5xHNY9N4yEE04AslBSyS7Fj4VciykD7Oukt0W6Zfteug1LMFOVWE3AOau13ai65W_yxoQrvbjQdbtT33JX4Mo_1V1uw.png" group-title="LOKAL INDONESIA™",METRO TV HD
-http://localhost:8080/stream/channel-18441?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18428" tvg-name="MNC TV" tvg-logo="http://goldenid.online:80/images/0eXynFBMWQjHfkx0379MZrDGEj5M1DQg4k-aOToZA1mHUHatl8sqWaKFe5pqBBJjv1oCunU9nfqtR48h2wYzXg.png" group-title="LOKAL INDONESIA™",MNC TV
-http://localhost:8080/stream/channel-18428?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18443" tvg-name="Moji TV" tvg-logo="http://goldenid.online:80/images/uuhCT73pRsf8MG14YjRAJiS7qQ9qrlYY3BOIGsO6vAFgh7lv9oRZDd8xNaLIcamHrcToQ7zlTLoefWtWn3KN6okO5JlVGuoS6nLOMsl5DR7SxFin0S73UcFmQHmVj9D_JGM7TXbPd7mv-DXzKxeiEw.jpeg" group-title="LOKAL INDONESIA™",Moji TV
-http://localhost:8080/stream/channel-18443?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18436" tvg-name="NET TV" tvg-logo="http://goldenid.online:80/images/Kanmk96vTt-hjZj_mC4RcPttLMlmeeoOsTOSXqs4fWXm360tfVL4n72DiGcqnmJjEM-uvp07OHeL3f6wXGCrsaBjtlugCyAnhpJFl-flPoEFBAf_55XripIuHrdNHt7-1OELNso9QtxVLwUTQhOZaCA3H2fGYstYqaQ8slVfgaQ.png" group-title="LOKAL INDONESIA™",NET TV
-http://localhost:8080/stream/channel-18436?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18543" tvg-name="RCTI" tvg-logo="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh2hH6cKLWO2FqXKf93hERFqgM6s9xbTZgwUsCK9kb0ktZT6zrqqZvA1l32L4QKi_7G2Cfj5HPJ9B4iFsJukRaks4goecHUdfDCAODAORVxfAnsDXD5FKCfoDB1bZs5G-dxN9Uw8ZcE9cQ/s600/RCTI.png" group-title="LOKAL INDONESIA™",RCTI
-http://localhost:8080/stream/channel-18543?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18427" tvg-name="RCTI (Sport)" tvg-logo="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh2hH6cKLWO2FqXKf93hERFqgM6s9xbTZgwUsCK9kb0ktZT6zrqqZvA1l32L4QKi_7G2Cfj5HPJ9B4iFsJukRaks4goecHUdfDCAODAORVxfAnsDXD5FKCfoDB1bZs5G-dxN9Uw8ZcE9cQ/s600/RCTI.png" group-title="LOKAL INDONESIA™",RCTI (Sport)
-http://localhost:8080/stream/channel-18427?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18442" tvg-name="RTV FHD" tvg-logo="http://goldenid.online:80/images/wtFA9pMcOn8VXZ_8fSjA4qfEGmMxxkWMhXnfInRK1v9NDBIiYpJv4XBjX31vy8FdeAREcyYmpTOcyXvd4Mye_qoFt_Lb45DFUSZMJJQ5xHM.jpg" group-title="LOKAL INDONESIA™",RTV FHD
-http://localhost:8080/stream/channel-18442?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18435" tvg-name="SCTV" tvg-logo="https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcQhRgMGuo5tkNsUW9BDLl6keD_aCwytJSKnjBINOsqFnFCFFNmW" group-title="LOKAL INDONESIA™",SCTV
-http://localhost:8080/stream/channel-18435?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18434" tvg-name="SCTV (Sport)" tvg-logo="http://goldenid.online:80/images/tcjBMuCD8M_zcpZuORRWzQaYp7zEO9FwxtiAOPLVkkeHoXsM3OMv1Soyy_zVhetNQGGOwDN5f7plivdrmFqc8D4VtawLxuvdtiEPImRdkT8tnmf6C4D4gywh1C5qH45ueKXi0iRoQVj8_x7qTM2YRA.jpeg" group-title="LOKAL INDONESIA™",SCTV (Sport)
-http://localhost:8080/stream/channel-18434?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18440" tvg-name="TV ONE" tvg-logo="https://thumbor.prod.vidiocdn.com/kdj7v6XCX9C4UeOv6anzUgPtIB8=/filters:strip_icc():quality(70)/vidio-web-prod-user/uploads/user/avatar/88855732/PROFILETVONE-1-e4d30ebee473657b.png" group-title="LOKAL INDONESIA™",TV ONE
-http://localhost:8080/stream/channel-18440?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18438" tvg-name="TVRI" tvg-logo="https://yt3.googleusercontent.com/ytc/AIdro_mhUyV8iNg5d_3sAtlPxTioVDSu2YBHr0CnFZdgqd6sJUk=s900-c-k-c0x00ffffff-no-rj" group-title="LOKAL INDONESIA™",TVRI
-http://localhost:8080/stream/channel-18438?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18431" tvg-name="Trans 7" tvg-logo="https://www.dropbox.com/scl/fi/csmtr3nvtk4kovqboua10/logo-trans7.png?rlkey=obg6f7jeqa3po1qbm0gg6y59p&st=84hwezqm&dl=1" group-title="LOKAL INDONESIA™",Trans 7
-http://localhost:8080/stream/channel-18431?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18523" tvg-name="Trans 7 Transmedia" tvg-logo="https://www.dropbox.com/scl/fi/csmtr3nvtk4kovqboua10/logo-trans7.png?rlkey=obg6f7jeqa3po1qbm0gg6y59p&st=84hwezqm&dl=1" group-title="LOKAL INDONESIA™",Trans 7 Transmedia
-http://localhost:8080/stream/channel-18523?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18432" tvg-name="Trans TV" tvg-logo="https://scontent.fkno6-1.fna.fbcdn.net/v/t39.30808-6/491958870_1320388576121056_722558272581708029_n.jpg?_nc_cat=1&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeGclKuRG8UnOEmuuiLtvqxwz1ZtYuIbK5zPVm1i4hsrnJRVhXqPFt89YGXQm3Y7Dq6Brp71YqbY5UNr2YDELPJd&_nc_ohc=5ySPksr-r3YQ7kNvwHCKF8z&_nc_oc=AdmjASzvwbpDGaPXN1_mXxFtSI8bAIA2vdQRFr0sy7bTNKYdNef1ey2V6udMfsRSCVI&_nc_zt=23&_nc_ht=scontent.fkno6-1.fna&_nc_gid=0R-8SbmfJvPWJI9cm-FqMA&oh=00_AfJu0DfK8dXaa_zQxIGgLEDI5KBmm6hKCNvvFUc4-EA8JQ&oe=682894CA" group-title="LOKAL INDONESIA™",Trans TV
-http://localhost:8080/stream/channel-18432?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18524" tvg-name="Trans TV Transmedia" tvg-logo="https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcQtIfkQ7F3PDmDIbeshisfZE83hMZO87drglKfEmPVwD9cqff0Y" group-title="LOKAL INDONESIA™",Trans TV Transmedia
-http://localhost:8080/stream/channel-18524?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
-#EXTINF:-1 tvg-id="18430" tvg-name="i News" tvg-logo="https://media.licdn.com/dms/image/v2/C510BAQEDNZ0BcKErOg/company-logo_200_200/company-logo_200_200/0/1631419517461/sindotv_logo?e=2147483647&v=beta&t=2mx6P3l2c8MwSXgOi-eQ3KT788ZU_wxKN7CSvggF8QE" group-title="LOKAL INDONESIA™",i News
-http://localhost:8080/stream/channel-18430?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18459" tvg-name="APPLE TV HD (MLS)" tvg-logo="https://encrypted-tbn2.gstatic.com/images?q=tbn:ANd9GcTgcj30o32kHGZqAmHZKyeDv1BEI0wa_r-W0KLtPNBYdFTADWuE" group-title="SPORTS™ FHD²",APPLE TV HD (MLS)
+http://localhost:8080/stream/channel-18459?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18452" tvg-name="Dazn F1" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2Nv0RR-L4PfIp-F95nanCcSwQDPXwC2ycINAxFqhwSIg.png" group-title="SPORTS™ FHD²",Dazn F1
+http://localhost:8080/stream/channel-18452?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18659" tvg-name="ES | TUDN" tvg-logo="https://tse1.mm.bing.net/th/id/OIP.SPrTXtyZwjE5wLtj-gXHCQHaHa?pid=Api&P=0&h=180" group-title="SPORTS™ FHD²",ES | TUDN
+http://localhost:8080/stream/channel-18659?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18407" tvg-name="ESPN 2 FHD" tvg-logo="https://comepbstatic.imgix.net/EPB2Go_ESPN2.png?fm=pjpg&auto=compress" group-title="SPORTS™ FHD²",ESPN 2 FHD
+http://localhost:8080/stream/channel-18407?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18619" tvg-name="ESPN Deportes HD" tvg-logo="http://goldenid.online:80/images/lE2-hQWVp5OGBfPF80NALVg70uDOtBg3IycH82t3GL53X3F9WRBbRB6oUuTqsr6nKxAxnWHgQMq5iVJgqx2C-G33-0aSejmSkD2bkfaNLCI.png" group-title="SPORTS™ FHD²",ESPN Deportes HD
+http://localhost:8080/stream/channel-18619?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18403" tvg-name="ESPN HD" tvg-logo="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQCbd6kY_7Hxwt55b4Un4hvpT6PPn5INtyfcOq-cd3t0iufvj3X" group-title="SPORTS™ FHD²",ESPN HD
+http://localhost:8080/stream/channel-18403?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18446" tvg-name="Eurosport 1 FHD" tvg-logo="http://goldenid.online:80/images/KYzhOpk4Ib8THEahYnAQqFNtn1zRopmPi4JdpNkVGxOrAhqeyHmLROzLXD8bZMmh.png" group-title="SPORTS™ FHD²",Eurosport 1 FHD
+http://localhost:8080/stream/channel-18446?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18448" tvg-name="Eurosport 2 FHD" tvg-logo="https://tse3.mm.bing.net/th?id=OIP.NGmf-C3o38_ojqW_deyZogAAAA&pid=Api&P=0&h=180" group-title="SPORTS™ FHD²",Eurosport 2 FHD
+http://localhost:8080/stream/channel-18448?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18604" tvg-name="HR: Arena Sport 1 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2ynaWDLxX5uVm4mfLF0kua4aJCVtTMt11ItwMYxBq410.png" group-title="SPORTS™ FHD²",HR: Arena Sport 1 FHD
+http://localhost:8080/stream/channel-18604?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18605" tvg-name="HR: Arena Sport 2 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4VJ-ZBvAnghSfzpxweshcFU.png" group-title="SPORTS™ FHD²",HR: Arena Sport 2 FHD
+http://localhost:8080/stream/channel-18605?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18606" tvg-name="HR: Arena Sport 3 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2ynaWDLxX5uVm4mfLF0kua3PbGR3rFEV001LacNJj2hU.png" group-title="SPORTS™ FHD²",HR: Arena Sport 3 FHD
+http://localhost:8080/stream/channel-18606?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18607" tvg-name="HR: Arena Sport 4 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4dnokkk0QhQRvGHeH9q8PeY.png" group-title="SPORTS™ FHD²",HR: Arena Sport 4 FHD
+http://localhost:8080/stream/channel-18607?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18608" tvg-name="HR: Arena Sport 5 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4c8DGdwv2UwI8jEMm8ivA_w.png" group-title="SPORTS™ FHD²",HR: Arena Sport 5 FHD
+http://localhost:8080/stream/channel-18608?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18609" tvg-name="HR: Arena Sport 6 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4XFhO8xE3HprOCCKtqUDMOM.png" group-title="SPORTS™ FHD²",HR: Arena Sport 6 FHD
+http://localhost:8080/stream/channel-18609?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18610" tvg-name="HR: Arena Sport 7 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4Z4F5xx82e-2miGdclDfT1g.png" group-title="SPORTS™ FHD²",HR: Arena Sport 7 FHD
+http://localhost:8080/stream/channel-18610?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18611" tvg-name="HR: Arena Sport 8 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4X9MmAy9SCwpRRrlRc92fJI.png" group-title="SPORTS™ FHD²",HR: Arena Sport 8 FHD
+http://localhost:8080/stream/channel-18611?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18653" tvg-name="LFC TV" tvg-logo="" group-title="SPORTS™ FHD²",LFC TV
+http://localhost:8080/stream/channel-18653?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18553" tvg-name="MU TV" tvg-logo="http://goldenid.online:80/images/3fGJPjuqzTNNtCuXKz8OpsEMgGbYwZfYheo5BuziIzbLf2WcKDQI91_t5c-W58jt2kbZNrr-5cXuChMJaaKoOTnf-4x_s2xB8K9Id7gVuKQ.png" group-title="SPORTS™ FHD²",MU TV
+http://localhost:8080/stream/channel-18553?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18654" tvg-name="Milan TV" tvg-logo="http://goldenid.online:80/images/XSTNKyrnWJkO-JmgKUOjUpxuO2mVMf91-XAlTxRLVcHYEdz_b9KLbaLOEOBNBPb51pRZbEJhT8TEwr5cZnrKpHt5zMYqFJMJQPdCoDuLmA0.jpg" group-title="SPORTS™ FHD²",Milan TV
+http://localhost:8080/stream/channel-18654?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18453" tvg-name="NL: ESPN 1 FHD" tvg-logo="https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcStuZmfLNZDc1RtgeJ-nnbZAxFt2jBsBBzo6g0JtXjMEALaI9em" group-title="SPORTS™ FHD²",NL: ESPN 1 FHD
+http://localhost:8080/stream/channel-18453?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18454" tvg-name="NL: ESPN 2 FHD" tvg-logo="https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcStuZmfLNZDc1RtgeJ-nnbZAxFt2jBsBBzo6g0JtXjMEALaI9em" group-title="SPORTS™ FHD²",NL: ESPN 2 FHD
+http://localhost:8080/stream/channel-18454?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18455" tvg-name="NL: ESPN 3 FHD" tvg-logo="https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcStuZmfLNZDc1RtgeJ-nnbZAxFt2jBsBBzo6g0JtXjMEALaI9em" group-title="SPORTS™ FHD²",NL: ESPN 3 FHD
+http://localhost:8080/stream/channel-18455?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18456" tvg-name="NL: ESPN 4 FHD" tvg-logo="https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcStuZmfLNZDc1RtgeJ-nnbZAxFt2jBsBBzo6g0JtXjMEALaI9em" group-title="SPORTS™ FHD²",NL: ESPN 4 FHD
+http://localhost:8080/stream/channel-18456?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18612" tvg-name="Orange Sport 1" tvg-logo="https://tvprofil.com/img/kanali-logo/Orange_Sport_1_RO_logo.png?1648548287" group-title="SPORTS™ FHD²",Orange Sport 1
+http://localhost:8080/stream/channel-18612?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18613" tvg-name="Orange Sport 2" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2wB7ritZBlop8hEbp9-1oxiH80IXimpuz8rRFpwAmLWc.png" group-title="SPORTS™ FHD²",Orange Sport 2
+http://localhost:8080/stream/channel-18613?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18614" tvg-name="Orange Sport 3" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2wB7ritZBlop8hEbp9-1oxkThcKeaVfoNlVk5B0XdPZ8.png" group-title="SPORTS™ FHD²",Orange Sport 3
+http://localhost:8080/stream/channel-18614?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18615" tvg-name="Orange Sport 4" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2wB7ritZBlop8hEbp9-1oxqP5e4oweb5x8i-OF9xrYeE.png" group-title="SPORTS™ FHD²",Orange Sport 4
+http://localhost:8080/stream/channel-18615?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18616" tvg-name="RMC Sport 1 FHD" tvg-logo="http://goldenid.online:80/images/yuEZEs85WZ4Yfghhk7ZWuBKXgA5zuVr_rNRNiskR4r9Lx5xuJ81y1DFiolxTK2TMToqRDiGP9vsieudopARG_fN1JOaabFxR_LeaqTrSE0A.png" group-title="SPORTS™ FHD²",RMC Sport 1 FHD
+http://localhost:8080/stream/channel-18616?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18617" tvg-name="RMC Sport 2 FHD" tvg-logo="http://goldenid.online:80/images/yuEZEs85WZ4Yfghhk7ZWuBKXgA5zuVr_rNRNiskR4r8BYfPh8v7_hjA_S2Q660Nr.png" group-title="SPORTS™ FHD²",RMC Sport 2 FHD
+http://localhost:8080/stream/channel-18617?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18618" tvg-name="RMC Sport 3 FHD" tvg-logo="http://goldenid.online:80/images/VI64j-lAlfcaXfEc-evZjfG8adaTpH--Z6TggUUpZEisfpLaNpQzT32Vpr_YWSTV_pOM10Wul2ZdFNJ1EXZC2tMz6gt8D6_MDalEUO-_4EA.png" group-title="SPORTS™ FHD²",RMC Sport 3 FHD
+http://localhost:8080/stream/channel-18618?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18396" tvg-name="RO: Digi Sport 1 FHD" tvg-logo="https://static.wikia.nocookie.net/logopedia/images/c/cf/Digi_Sport_1.svg/revision/latest/scale-to-width-down/1000?cb=20231115203636" group-title="SPORTS™ FHD²",RO: Digi Sport 1 FHD
+http://localhost:8080/stream/channel-18396?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18397" tvg-name="RO: Digi Sport 2 FHD" tvg-logo="https://static.wikia.nocookie.net/logopedia/images/a/ad/Digi_Sport_2.svg/revision/latest/scale-to-width-down/200?cb=20231115203201" group-title="SPORTS™ FHD²",RO: Digi Sport 2 FHD
+http://localhost:8080/stream/channel-18397?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18398" tvg-name="RO: Digi Sport 3 FHD" tvg-logo="https://static.wikia.nocookie.net/logopedia/images/1/16/Digi_Sport_3.svg/revision/latest/scale-to-width-down/1200?cb=20231115203507" group-title="SPORTS™ FHD²",RO: Digi Sport 3 FHD
+http://localhost:8080/stream/channel-18398?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18655" tvg-name="Real Madrid TV" tvg-logo="" group-title="SPORTS™ FHD²",Real Madrid TV
+http://localhost:8080/stream/channel-18655?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18501" tvg-name="SR: Arena Sport 1 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4eb3YMpjzTEtzTlQ93-VYds.png" group-title="SPORTS™ FHD²",SR: Arena Sport 1 FHD
+http://localhost:8080/stream/channel-18501?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18510" tvg-name="SR: Arena Sport 10 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4VU93C4x6e23__8MR8GDpJo.png" group-title="SPORTS™ FHD²",SR: Arena Sport 10 FHD
+http://localhost:8080/stream/channel-18510?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18502" tvg-name="SR: Arena Sport 2 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4VJ-ZBvAnghSfzpxweshcFU.png" group-title="SPORTS™ FHD²",SR: Arena Sport 2 FHD
+http://localhost:8080/stream/channel-18502?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18503" tvg-name="SR: Arena Sport 3 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4fwogztxviJQ6LelD9yqZ80.png" group-title="SPORTS™ FHD²",SR: Arena Sport 3 FHD
+http://localhost:8080/stream/channel-18503?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18504" tvg-name="SR: Arena Sport 4 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4dnokkk0QhQRvGHeH9q8PeY.png" group-title="SPORTS™ FHD²",SR: Arena Sport 4 FHD
+http://localhost:8080/stream/channel-18504?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18505" tvg-name="SR: Arena Sport 5 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4c8DGdwv2UwI8jEMm8ivA_w.png" group-title="SPORTS™ FHD²",SR: Arena Sport 5 FHD
+http://localhost:8080/stream/channel-18505?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18506" tvg-name="SR: Arena Sport 6 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4XFhO8xE3HprOCCKtqUDMOM.png" group-title="SPORTS™ FHD²",SR: Arena Sport 6 FHD
+http://localhost:8080/stream/channel-18506?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18507" tvg-name="SR: Arena Sport 7 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4Z4F5xx82e-2miGdclDfT1g.png" group-title="SPORTS™ FHD²",SR: Arena Sport 7 FHD
+http://localhost:8080/stream/channel-18507?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18508" tvg-name="SR: Arena Sport 8 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4X9MmAy9SCwpRRrlRc92fJI.png" group-title="SPORTS™ FHD²",SR: Arena Sport 8 FHD
+http://localhost:8080/stream/channel-18508?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18509" tvg-name="SR: Arena Sport 9 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2djlzWFpXL_0RFxm3NsJi4RE_tnOriVl179ovyjUrPUc.png" group-title="SPORTS™ FHD²",SR: Arena Sport 9 FHD
+http://localhost:8080/stream/channel-18509?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18404" tvg-name="Sony Sports 1 HD" tvg-logo="https://static.wikia.nocookie.net/logopedia/images/e/ed/Sony_Sports_Ten_1.png/revision/latest/scale-to-width-down/460?cb=20221025083646" group-title="SPORTS™ FHD²",Sony Sports 1 HD
+http://localhost:8080/stream/channel-18404?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18405" tvg-name="Sony Sports 2 HD" tvg-logo="http://goldenid.online:80/images/H0C2CnRBBj6PibIAkFp00q36neU9_JuXz8vSNnpo-Xosk8SGY_u9pdjXlzj8mn9DGE1CyM_o9yWOXJofjDqSvy5XiVF_M4QgnhlVx51Bq8sFVayNdn6I9wC8peg1PCzE.png" group-title="SPORTS™ FHD²",Sony Sports 2 HD
+http://localhost:8080/stream/channel-18405?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18406" tvg-name="Sony Sports 3 HD" tvg-logo="https://static.wikia.nocookie.net/logopedia/images/f/ff/Sony_Sports_Ten_3.png/revision/latest/scale-to-width-down/460?cb=20221025085433" group-title="SPORTS™ FHD²",Sony Sports 3 HD
+http://localhost:8080/stream/channel-18406?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18528" tvg-name="Sportv 1 FHD" tvg-logo="http://goldenid.online:80/images/KmEMVVnmX6kh1H_KyN9ab1_lDcDZJMWIXCXtOAEWpqWHCTg8-KTEH7sX-dM0uC65pVarXt6ForkMZaTU5pOqqINqh2cPt6mgwyO8NfBf56awlL8dTB9cbWWTbN_ACdPP.jpg" group-title="SPORTS™ FHD²",Sportv 1 FHD
+http://localhost:8080/stream/channel-18528?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18529" tvg-name="Sportv 2 FHD" tvg-logo="http://goldenid.online:80/images/KmEMVVnmX6kh1H_KyN9ab1_lDcDZJMWIXCXtOAEWpqWHCTg8-KTEH7sX-dM0uC65pVarXt6ForkMZaTU5pOqqINqh2cPt6mgwyO8NfBf56awlL8dTB9cbWWTbN_ACdPP.jpg" group-title="SPORTS™ FHD²",Sportv 2 FHD
+http://localhost:8080/stream/channel-18529?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18530" tvg-name="Sportv 3 FHD" tvg-logo="http://goldenid.online:80/images/KmEMVVnmX6kh1H_KyN9ab1_lDcDZJMWIXCXtOAEWpqWHCTg8-KTEH7sX-dM0uC65pVarXt6ForkMZaTU5pOqqINqh2cPt6mgwyO8NfBf56awlL8dTB9cbWWTbN_ACdPP.jpg" group-title="SPORTS™ FHD²",Sportv 3 FHD
+http://localhost:8080/stream/channel-18530?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18449" tvg-name="TSN 1 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2hvplFqTbhADe2eLYQORyIA.png" group-title="SPORTS™ FHD²",TSN 1 FHD
+http://localhost:8080/stream/channel-18449?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18450" tvg-name="TSN 2 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs2RHj3Bx0ETnPNNkp2r7u5cw.png" group-title="SPORTS™ FHD²",TSN 2 FHD
+http://localhost:8080/stream/channel-18450?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18451" tvg-name="TSN 3 FHD" tvg-logo="http://goldenid.online:80/images/6-dAzD3lKsnL-rwX3CZYYKZ3rQBtgWjFQaFdVd-9Qkzf6c9rtHMwoJ_uxidnCbs20ciP-ejSentcPXhvZdAsWA.png" group-title="SPORTS™ FHD²",TSN 3 FHD
+http://localhost:8080/stream/channel-18451?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18658" tvg-name="TUDN" tvg-logo="https://tse1.mm.bing.net/th/id/OIP.SPrTXtyZwjE5wLtj-gXHCQHaHa?pid=Api&P=0&h=180" group-title="SPORTS™ FHD²",TUDN
+http://localhost:8080/stream/channel-18658?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18591" tvg-name="TYC Sport" tvg-logo="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSzdlSI9ppP4MMhSknYfbT2XrBCPKzcKbk42B9ASori9w2UFSw_WJ5SBpbqV3__5UTliZ4&usqp=CAU" group-title="SPORTS™ FHD²",TYC Sport
+http://localhost:8080/stream/channel-18591?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18544" tvg-name="Tenis Channel" tvg-logo="https://media.licdn.com/dms/image/v2/C4E0BAQGjvnBSYRriIw/company-logo_200_200/company-logo_200_200/0/1646327585440/the_tennis_channel_logo?e=2147483647&v=beta&t=_T_xKpgh-nmQ55dC5pxE4Ng2r2YYmDG25ulDKWSuztQ" group-title="SPORTS™ FHD²",Tenis Channel
+http://localhost:8080/stream/channel-18544?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91
+#EXTINF:-1 tvg-id="18408" tvg-name="WWE HD" tvg-logo="http://goldenid.online:80/images/Kanmk96vTt-hjZj_mC4RcPttLMlmeeoOsTOSXqs4fWXJhU6MPEtAymHhhyT7Cj5OaKTRqO9B6DowlEw_YpWBUz3EJO2h5NTYrNDv11OJLO0.jpeg" group-title="SPORTS™ FHD²",WWE HD
+http://localhost:8080/stream/channel-18408?username=fddfh&password=b4b9e52e1f17298472afa8be83e2bc91

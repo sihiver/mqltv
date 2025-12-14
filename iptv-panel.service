@@ -14,6 +14,9 @@ StandardError=append:/home/dindin/mqltv/server.log
 
 # Environment variables
 Environment="DB_PATH=/home/dindin/mqltv/iptv.db"
+Environment="HOST=YOUR_VPS_IP:8080"
+# Contoh: Environment="HOST=203.0.113.10:8080"
+# Atau dengan domain: Environment="HOST=iptv.yourdomain.com"
 
 # Security settings
 NoNewPrivileges=true

@@ -78,6 +78,9 @@ func main() {
 	api.HandleFunc("/auth/profile", handlers.GetProfile).Methods("GET")
 	api.HandleFunc("/auth/update-profile", handlers.UpdateProfile).Methods("POST")
 	
+	// Admin preview (protected - bypass user auth)
+	api.HandleFunc("/channels/{id}/preview", handlers.AdminPreviewChannel).Methods("GET")
+	
 	// Stats
 	api.HandleFunc("/stats", handlers.GetStats).Methods("GET")
 	api.HandleFunc("/recently-watched", handlers.GetRecentlyWatchedChannels).Methods("GET")

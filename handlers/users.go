@@ -668,6 +668,33 @@ func GenerateUserPlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 	rows.Close() // Close rows before creating relays
 
+	// Delete old relays for this user (cleanup before regenerating)
+	// Get old relay paths for this user's channels
+	oldRelayPaths := []string{}
+	oldRelayRows, err := database.DB.Query(`
+		SELECT DISTINCT output_path FROM relays 
+		WHERE output_path LIKE 'channel-%' 
+		AND output_path IN (
+			SELECT 'channel-' || c.id 
+			FROM channels c 
+			WHERE c.id IN (` + strings.Join(placeholders, ",") + `)
+		)
+	`, args...)
+	if err == nil {
+		for oldRelayRows.Next() {
+			var path string
+			if err := oldRelayRows.Scan(&path); err == nil {
+				oldRelayPaths = append(oldRelayPaths, path)
+			}
+		}
+		oldRelayRows.Close()
+		
+		// Delete old relays
+		for _, path := range oldRelayPaths {
+			database.DB.Exec("DELETE FROM relays WHERE output_path = ?", path)
+		}
+	}
+
 	// Build M3U content
 	m3uContent := "#EXTM3U\n"
 	host := os.Getenv("HOST")
