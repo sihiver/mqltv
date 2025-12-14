@@ -126,28 +126,24 @@ const extendSubscription = async () => {
 const toggleUserStatus = async (user: any) => {
   const action = user.disabled ? 'enable' : 'disable'
   const actionText = user.disabled ? 'Enable' : 'Disable'
-  
+
   try {
-    await ElMessageBox.confirm(
-      `${actionText} user "${user.username}"?`,
-      `${actionText} User`,
-      {
-        confirmButtonText: actionText,
-        cancelButtonText: 'Cancel',
-        type: 'warning'
-      }
-    )
+    await ElMessageBox.confirm(`${actionText} user "${user.username}"?`, `${actionText} User`, {
+      confirmButtonText: actionText,
+      cancelButtonText: 'Cancel',
+      type: 'warning'
+    })
 
     const res = await request.post({
       url: `/api/users/${user.id}/toggle`
     })
-    
+
     // Update user status instantly in UI from response
     if (res && res.data) {
       user.is_active = res.data.is_active
       user.disabled = !res.data.is_active
     }
-    
+
     ElMessage.success(`User ${action}d successfully`)
   } catch (error: any) {
     if (error !== 'cancel') {
@@ -228,10 +224,10 @@ onMounted(() => {
             </template>
             Extend
           </ElButton>
-          <ElButton 
-            :type="row.disabled ? 'success' : 'warning'" 
-            size="small" 
-            text 
+          <ElButton
+            :type="row.disabled ? 'success' : 'warning'"
+            size="small"
+            text
             @click="toggleUserStatus(row)"
           >
             <template #icon>
