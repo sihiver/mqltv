@@ -249,7 +249,7 @@ const handlePlayback = (row: any) => {
   // Use direct source URL instead of preview endpoint
   playbackUrl.value = row.url
   playbackDialogVisible.value = true
-  
+
   // Initialize HLS player after dialog opens
   nextTick(() => {
     initPlayer()
@@ -278,16 +278,16 @@ const initPlayer = () => {
         xhr.withCredentials = false
       }
     })
-    
+
     hls.loadSource(streamUrl)
     hls.attachMedia(video)
-    
+
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
       video.play().catch((err) => {
         console.warn('Autoplay failed:', err)
       })
     })
-    
+
     hls.on(Hls.Events.ERROR, (event, data) => {
       console.error('HLS error:', data)
       if (data.fatal) {
@@ -338,13 +338,13 @@ const closePlayback = () => {
     hls.destroy()
     hls = null
   }
-  
+
   // Reset video element
   if (videoRef.value) {
     videoRef.value.pause()
     videoRef.value.src = ''
   }
-  
+
   playbackDialogVisible.value = false
   playbackChannel.value = null
   playbackUrl.value = ''
@@ -475,7 +475,7 @@ onUnmounted(() => {
   if (activeChannelsInterval) {
     clearInterval(activeChannelsInterval)
   }
-  
+
   // Cleanup HLS instance
   if (hls) {
     hls.destroy()
@@ -680,11 +680,7 @@ onUnmounted(() => {
             max-height: 500px;
           "
         >
-          <video
-            ref="videoRef"
-            controls
-            style="width: 100%; height: 100%; object-fit: contain"
-          >
+          <video ref="videoRef" controls style="width: 100%; height: 100%; object-fit: contain">
             Your browser does not support the video tag.
           </video>
         </div>
