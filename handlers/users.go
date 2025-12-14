@@ -276,6 +276,46 @@ func ResetUserPassword(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ToggleUserStatus toggles user's active status
+func ToggleUserStatus(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get current status
+	var isActive bool
+	err = database.DB.QueryRow("SELECT is_active FROM users WHERE id = ?", userID).Scan(&isActive)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Toggle status
+	newStatus := !isActive
+	_, err = database.DB.Exec("UPDATE users SET is_active = ? WHERE id = ?", newStatus, userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	statusText := "disabled"
+	if newStatus {
+		statusText = "enabled"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":      0,
+		"message":   fmt.Sprintf("User %s successfully", statusText),
+		"data": map[string]interface{}{
+			"is_active": newStatus,
+		},
+	})
+}
+
 // GetUserConnections returns active connections for a user
 func GetUserConnections(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)

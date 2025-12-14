@@ -23,11 +23,6 @@ const bandwidth = ref({
   totalUploadMB: 0
 })
 
-// Previous bandwidth values for rate calculation
-let prevBytesRead = 0
-let prevBytesWritten = 0
-let prevTimestamp = Date.now()
-
 // Chart data
 const timeLabels = ref<string[]>([])
 const downloadData = ref<number[]>([])
@@ -66,31 +61,23 @@ const loadBandwidth = async () => {
   try {
     const res = await request.get({ url: '/api/streams/status' })
     if (res && res.data) {
-      const bytesRead = res.data.total_bytes_read || 0
-      const bytesWritten = res.data.total_bytes_write || 0
-      const now = Date.now()
+      const streams = Array.isArray(res.data.streams) ? res.data.streams : []
+      const bytesRead = Number(res.data.total_bytes_read || 0)
+      const bytesWritten = Number(res.data.total_bytes_write || 0)
 
-      // Initialize on first run
-      if (prevBytesRead === 0 && prevBytesWritten === 0) {
-        prevBytesRead = bytesRead
-        prevBytesWritten = bytesWritten
-        prevTimestamp = now
-        // Don't update chart on first run, just initialize
-        return
+      // Use backend-provided per-stream rates (already smoothed server-side)
+      let downloadRate = 0
+      let uploadRate = 0
+      for (const stream of streams) {
+        downloadRate += Number(stream.download_mbps || 0)
+        uploadRate += Number(stream.upload_mbps || 0)
       }
 
-      // Calculate rates (Mbps = megabits per second)
-      const timeDelta = (now - prevTimestamp) / 1000 // seconds
-      const downloadRate =
-        timeDelta > 0 ? ((bytesRead - prevBytesRead) * 8) / 1024 / 1024 / timeDelta : 0
-      const uploadRate =
-        timeDelta > 0 ? ((bytesWritten - prevBytesWritten) * 8) / 1024 / 1024 / timeDelta : 0
-
       bandwidth.value = {
-        downloadMbps: downloadRate.toFixed(2),
-        uploadMbps: uploadRate.toFixed(2),
-        totalDownloadMB: (bytesRead / 1024 / 1024).toFixed(2),
-        totalUploadMB: (bytesWritten / 1024 / 1024).toFixed(2)
+        downloadMbps: Number(downloadRate.toFixed(2)),
+        uploadMbps: Number(uploadRate.toFixed(2)),
+        totalDownloadMB: Number((bytesRead / 1024 / 1024).toFixed(2)),
+        totalUploadMB: Number((bytesWritten / 1024 / 1024).toFixed(2))
       }
 
       // Update chart data
@@ -102,8 +89,8 @@ const loadBandwidth = async () => {
       })
 
       timeLabels.value.push(currentTime)
-      downloadData.value.push(parseFloat(downloadRate.toFixed(2)))
-      uploadData.value.push(parseFloat(uploadRate.toFixed(2)))
+      downloadData.value.push(bandwidth.value.downloadMbps)
+      uploadData.value.push(bandwidth.value.uploadMbps)
 
       // Keep only last N data points
       if (timeLabels.value.length > maxDataPoints) {
@@ -112,13 +99,7 @@ const loadBandwidth = async () => {
         uploadData.value.shift()
       }
 
-      // Update chart
       updateChart()
-
-      // Update previous values
-      prevBytesRead = bytesRead
-      prevBytesWritten = bytesWritten
-      prevTimestamp = now
     }
   } catch (error) {
     console.error('Error loading bandwidth:', error)

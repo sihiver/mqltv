@@ -119,6 +119,7 @@ func main() {
 	api.HandleFunc("/users/{id}", handlers.GetUserDetail).Methods("GET")
 	api.HandleFunc("/users/{id}", handlers.UpdateUser).Methods("PUT")
 	api.HandleFunc("/users/{id}", handlers.DeleteUser).Methods("DELETE")
+	api.HandleFunc("/users/{id}/toggle", handlers.ToggleUserStatus).Methods("POST")
 	api.HandleFunc("/users/{id}/reset-password", handlers.ResetUserPassword).Methods("POST")
 	api.HandleFunc("/users/{id}/connections", handlers.GetUserConnections).Methods("GET")
 	api.HandleFunc("/users/{id}/set-expired", handlers.SetUserExpired).Methods("POST")

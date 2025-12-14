@@ -5,21 +5,22 @@ function startBandwidthMonitoring() {
         clearInterval(bandwidthMonitorInterval);
     }
     updateBandwidthStats();
-    bandwidthMonitorInterval = setInterval(updateBandwidthStats, 3000);
+    bandwidthMonitorInterval = setInterval(updateBandwidthStats, 3000); // Poll every 3 seconds for stability
 }
 
 async function updateBandwidthStats() {
     try {
         const response = await fetch('/api/streams/status');
         const data = await response.json();
+        const payload = data && data.data ? data.data : data;
         
         let totalDownloadMbps = 0;
         let totalUploadMbps = 0;
         let totalDownloadMB = 0;
         let totalUploadMB = 0;
         
-        if (data.streams && data.streams.length > 0) {
-            data.streams.forEach(stream => {
+        if (payload && payload.streams && payload.streams.length > 0) {
+            payload.streams.forEach(stream => {
                 totalDownloadMbps += stream.download_mbps || 0;
                 totalUploadMbps += stream.upload_mbps || 0;
                 totalDownloadMB += (stream.bytes_read || 0) / 1024 / 1024;

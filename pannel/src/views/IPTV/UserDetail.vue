@@ -36,6 +36,10 @@ const loadUserDetail = async () => {
     const res = await request.get({ url: `/api/users/${userId}` })
     if (res && res.data) {
       userDetail.value = res.data
+      // Map is_active to disabled for UI
+      if (userDetail.value.user) {
+        userDetail.value.user.disabled = !userDetail.value.user.is_active
+      }
       // Use channels from API response (only user's channels)
       if (res.data.channels) {
         channels.value = res.data.channels
@@ -101,28 +105,32 @@ const extendSubscription = async () => {
   }
 }
 
-const resetPassword = async () => {
+const toggleUserStatus = async () => {
+  const user = userDetail.value?.user
+  if (!user) return
+  
+  const action = user.disabled ? 'enable' : 'disable'
+  const actionText = user.disabled ? 'Enable' : 'Disable'
+  
   try {
-    const result = await ElMessageBox.prompt(
-      `Enter new password for user "${userDetail.value?.user.username}"`,
-      'Reset Password',
+    await ElMessageBox.confirm(
+      `${actionText} user "${user.username}"?`,
+      `${actionText} User`,
       {
-        confirmButtonText: 'Reset',
+        confirmButtonText: actionText,
         cancelButtonText: 'Cancel',
-        inputPattern: /.+/,
-        inputErrorMessage: 'Password is required'
+        type: 'warning'
       }
     )
 
     await request.post({
-      url: `/api/users/${userId}/reset-password`,
-      data: { password: result.value }
+      url: `/api/users/${userId}/toggle`
     })
-    ElMessage.success('Password reset successfully')
+    ElMessage.success(`User ${action}d successfully`)
     loadUserDetail()
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('Failed to reset password')
+      ElMessage.error(`Failed to ${action} user`)
     }
   }
 }
@@ -143,9 +151,13 @@ onMounted(() => {
         <Icon icon="ep:calendar" />
         Extend Subscription
       </ElButton>
-      <ElButton type="warning" @click="resetPassword" style="margin-left: 8px">
-        <Icon icon="ep:lock" />
-        Reset Password
+      <ElButton 
+        :type="userDetail?.user.disabled ? 'success' : 'warning'" 
+        @click="toggleUserStatus" 
+        style="margin-left: 8px"
+      >
+        <Icon :icon="userDetail?.user.disabled ? 'ep:check' : 'ep:close'" />
+        {{ userDetail?.user.disabled ? 'Enable User' : 'Disable User' }}
       </ElButton>
     </div>
 

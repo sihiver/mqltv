@@ -4,13 +4,17 @@
 let currentUserPopup = null;
 
 // Show user actions popup
-function showUserActions(userId, username, event) {
+function showUserActions(userId, username, isActive, event) {
     event.stopPropagation();
     
     // Close any existing popup
     if (currentUserPopup) {
         currentUserPopup.remove();
     }
+    
+    // Determine toggle button text and style
+    const toggleText = isActive ? '🚫 Disable User' : '✅ Enable User';
+    const toggleClass = isActive ? 'btn-warning' : 'btn-success';
     
     // Create popup
     const popup = document.createElement('div');
@@ -33,8 +37,8 @@ function showUserActions(userId, username, event) {
             <button class="popup-action-btn" onclick="editUser(${userId}); closeUserActionsPopup();">
                 ✏️ Edit User
             </button>
-            <button class="popup-action-btn" onclick="resetPassword(${userId}); closeUserActionsPopup();">
-                🔑 Reset Password
+            <button class="popup-action-btn ${toggleClass}" onclick="toggleUserStatus(${userId}, '${username}', ${isActive}); closeUserActionsPopup();">
+                ${toggleText}
             </button>
             <button class="popup-action-btn btn-warning" onclick="setExpired(${userId}, '${username}'); closeUserActionsPopup();">
                 ⏰ Test Expired
@@ -114,7 +118,7 @@ async function loadUsers() {
                     <td style="text-align: center;">${statusBadge}</td>
                     <td style="text-align: center;">${daysDisplay}</td>
                     <td style="text-align: center;">
-                        <button class="btn btn-sm btn-primary" onclick="showUserActions(${user.id}, '${user.username}', event)">⚙️ Actions</button>
+                        <button class="btn btn-sm btn-primary" onclick="showUserActions(${user.id}, '${user.username}', ${user.is_active}, event)">⚙️ Actions</button>
                     </td>
                 </tr>
             `;
@@ -214,19 +218,23 @@ async function editUser(userId) {
     }
 }
 
-async function resetPassword(userId) {
-    const newPassword = prompt('Password baru:');
-    if (!newPassword) return;
+async function toggleUserStatus(userId, username, currentStatus) {
+    const action = currentStatus ? 'disable' : 'enable';
+    if (!confirm(`Apakah Anda yakin ingin ${action} user "${username}"?`)) return;
     
     try {
-        const response = await fetch(`/api/users/${userId}/reset-password`, {
+        const response = await fetch(`/api/users/${userId}/toggle`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ new_password: newPassword })
+            headers: { 'Content-Type': 'application/json' }
         });
         
+        const result = await response.json();
+        
         if (response.ok) {
-            alert('Password berhasil direset!');
+            alert(result.message || 'Status user berhasil diubah!');
+            loadUsers();
+        } else {
+            alert('Error: ' + (result.error || 'Failed to toggle user status'));
         }
     } catch (error) {
         alert('Error: ' + error.message);

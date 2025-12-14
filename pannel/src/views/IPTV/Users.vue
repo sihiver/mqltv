@@ -40,7 +40,11 @@ const loadUsers = async () => {
   try {
     const res = await request.get({ url: '/api/users' })
     if (res && res.data) {
-      users.value = res.data
+      // Map is_active to disabled for UI
+      users.value = res.data.map((user: any) => ({
+        ...user,
+        disabled: !user.is_active
+      }))
     }
   } catch (error) {
     console.error('Error loading users:', error)
@@ -119,27 +123,35 @@ const extendSubscription = async () => {
   }
 }
 
-const resetPassword = async (user: any) => {
+const toggleUserStatus = async (user: any) => {
+  const action = user.disabled ? 'enable' : 'disable'
+  const actionText = user.disabled ? 'Enable' : 'Disable'
+  
   try {
-    const result = await ElMessageBox.prompt(
-      `Enter new password for user "${user.username}"`,
-      'Reset Password',
+    await ElMessageBox.confirm(
+      `${actionText} user "${user.username}"?`,
+      `${actionText} User`,
       {
-        confirmButtonText: 'Reset',
+        confirmButtonText: actionText,
         cancelButtonText: 'Cancel',
-        inputPattern: /.+/,
-        inputErrorMessage: 'Password is required'
+        type: 'warning'
       }
     )
 
-    await request.post({
-      url: `/api/users/${user.id}/reset-password`,
-      data: { password: result.value }
+    const res = await request.post({
+      url: `/api/users/${user.id}/toggle`
     })
-    ElMessage.success('Password reset successfully')
+    
+    // Update user status instantly in UI from response
+    if (res && res.data) {
+      user.is_active = res.data.is_active
+      user.disabled = !res.data.is_active
+    }
+    
+    ElMessage.success(`User ${action}d successfully`)
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('Failed to reset password')
+      ElMessage.error(`Failed to ${action} user`)
     }
   }
 }
@@ -216,11 +228,16 @@ onMounted(() => {
             </template>
             Extend
           </ElButton>
-          <ElButton type="warning" size="small" text @click="resetPassword(row)">
+          <ElButton 
+            :type="row.disabled ? 'success' : 'warning'" 
+            size="small" 
+            text 
+            @click="toggleUserStatus(row)"
+          >
             <template #icon>
-              <Icon icon="ep:lock" />
+              <Icon :icon="row.disabled ? 'ep:check' : 'ep:close'" />
             </template>
-            Reset
+            {{ row.disabled ? 'Enable' : 'Disable' }}
           </ElButton>
           <ElButton type="danger" size="small" @click="deleteUser(row)">
             <template #icon>

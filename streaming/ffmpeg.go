@@ -31,6 +31,19 @@ type FFmpegSession struct {
 	retryCount    int       // Number of consecutive failures
 	lastFailTime  time.Time // Last time FFmpeg failed
 	isBlacklisted bool      // If true, stop trying to restart
+	
+	// Real-time bandwidth tracking with sliding window
+	lastBytesRead     uint64
+	lastBytesWritten  uint64
+	lastStatsTime     time.Time
+	currentDownloadMbps float64
+	currentUploadMbps   float64
+	smoothingFactor     float64
+	
+	// Sliding window for stable average
+	bytesHistory      []uint64  // History of bytes read
+	bytesWriteHistory []uint64  // History of bytes written
+	timeHistory       []time.Time
 }
 
 // StreamPipe handles FFmpeg output piping to multiple clients
@@ -75,6 +88,7 @@ func (m *FFmpegManager) GetOrCreateFFmpegSession(streamID string, sourceURLs []s
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	now := time.Now()
 	session := &FFmpegSession{
 		ID:           streamID,
 		SourceURLs:   sourceURLs,
@@ -82,8 +96,13 @@ func (m *FFmpegManager) GetOrCreateFFmpegSession(streamID string, sourceURLs []s
 		ctx:          ctx,
 		cancel:       cancel,
 		clients:      make(map[string]*StreamClient),
-		lastActivity: time.Now(),
-		startTime:    time.Now(),
+		lastActivity: now,
+		startTime:    now,
+		lastStatsTime: now,
+		smoothingFactor: 0.6,
+		bytesHistory:     make([]uint64, 0, 10),
+		bytesWriteHistory: make([]uint64, 0, 10),
+		timeHistory:      make([]time.Time, 0, 10),
 		pipeWriter: &StreamPipe{
 			readers: make(map[string]chan []byte),
 			buffer:  NewRingBuffer(5 * 1024 * 1024), // 5MB buffer
@@ -476,12 +495,39 @@ func (s *FFmpegSession) GetStats() map[string]interface{} {
 	s.bytesMux.RUnlock()
 
 	uptime := time.Since(s.startTime).Seconds()
-	downloadBps := float64(0)
-	uploadBps := float64(0)
+	now := time.Now()
 	
-	if uptime > 0 {
-		downloadBps = float64(bytesRead) / uptime      // bytes/sec from source
-		uploadBps = float64(bytesWritten) / uptime      // bytes/sec to clients
+	// Add current sample to history
+	s.bytesHistory = append(s.bytesHistory, bytesRead)
+	s.bytesWriteHistory = append(s.bytesWriteHistory, bytesWritten)
+	s.timeHistory = append(s.timeHistory, now)
+	
+	// Keep only last 10 samples (sliding window ~30 seconds at 3s interval)
+	maxSamples := 10
+	if len(s.bytesHistory) > maxSamples {
+		s.bytesHistory = s.bytesHistory[1:]
+		s.bytesWriteHistory = s.bytesWriteHistory[1:]
+		s.timeHistory = s.timeHistory[1:]
+	}
+	
+	// Calculate average rate over the sliding window
+	// Note: Mbps here means megabits/sec (bytes/sec * 8).
+	downloadMbps := float64(0)
+	uploadMbps := float64(0)
+	
+	if len(s.bytesHistory) >= 2 {
+		// Calculate rate from oldest to newest sample in window
+		oldestIdx := 0
+		newestIdx := len(s.bytesHistory) - 1
+		
+		bytesDiffRead := s.bytesHistory[newestIdx] - s.bytesHistory[oldestIdx]
+		bytesDiffWritten := s.bytesWriteHistory[newestIdx] - s.bytesWriteHistory[oldestIdx]
+		timeDiff := s.timeHistory[newestIdx].Sub(s.timeHistory[oldestIdx]).Seconds()
+		
+		if timeDiff > 0 {
+			downloadMbps = (float64(bytesDiffRead) * 8 / timeDiff) / 1024 / 1024
+			uploadMbps = (float64(bytesDiffWritten) * 8 / timeDiff) / 1024 / 1024
+		}
 	}
 
 	return map[string]interface{}{
@@ -493,10 +539,8 @@ func (s *FFmpegSession) GetStats() map[string]interface{} {
 		"last_activity":   s.lastActivity,
 		"bytes_read":      bytesRead,
 		"bytes_written":   bytesWritten,
-		"download_bps":    downloadBps,
-		"upload_bps":      uploadBps,
-		"download_mbps":   downloadBps / 1024 / 1024,
-		"upload_mbps":     uploadBps / 1024 / 1024,
+		"download_mbps":   downloadMbps,
+		"upload_mbps":     uploadMbps,
 	}
 }
 
