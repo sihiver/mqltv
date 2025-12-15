@@ -171,7 +171,30 @@ const deleteChannel = async (channel: any) => {
 }
 
 const handleSelectionChange = (selection: any[]) => {
-  selectedChannels.value = new Set(selection.map((ch) => ch.id))
+  // Element Plus only reports selection for the currently rendered page.
+  // Preserve global selection across pagination by only updating IDs on this page.
+  const currentPageIds = new Set(filteredChannels.value.map((ch: any) => ch.id))
+  const selectedIdsOnPage = new Set(selection.map((ch) => ch.id))
+
+  currentPageIds.forEach((id) => {
+    if (!selectedIdsOnPage.has(id)) {
+      selectedChannels.value.delete(id)
+    }
+  })
+
+  selectedIdsOnPage.forEach((id) => {
+    selectedChannels.value.add(id)
+  })
+}
+
+const handleSelectAll = (selection: any[]) => {
+  // Header checkbox toggles selection for the current page only by default.
+  // We map it to "select all filtered" across pages.
+  if (!selection || selection.length === 0) {
+    clearSelection()
+    return
+  }
+  selectAllFiltered()
 }
 
 const selectAllFiltered = () => {
@@ -539,6 +562,7 @@ onUnmounted(() => {
       row-key="id"
       v-loading="loading"
       @selection-change="handleSelectionChange"
+      @select-all="handleSelectAll"
       style="width: 100%"
     >
       <ElTableColumn type="selection" width="55" />
