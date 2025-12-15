@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ContentWrap } from '@/components/ContentWrap'
+import { Icon } from '@/components/Icon'
 import {
   ElForm,
   ElFormItem,
@@ -9,7 +10,8 @@ import {
   ElButton,
   ElMessage,
   ElRow,
-  ElCol
+  ElCol,
+  ElCard
 } from 'element-plus'
 import { ref, onMounted, computed } from 'vue'
 import request from '@/axios'
@@ -127,23 +129,68 @@ onMounted(() => {
 
 <template>
   <ContentWrap title="Generate Playlist" message="Create custom user playlists">
-    <div style="max-width: 800px">
-      <ElForm label-width="120px">
-        <ElFormItem label="Select User">
-          <ElSelect v-model="selectedUser" placeholder="Choose user" style="width: 100%">
-            <ElOption
-              v-for="user in users"
-              :key="user.id"
-              :label="user.username"
-              :value="user.id"
-            />
-          </ElSelect>
-        </ElFormItem>
+    <ElRow :gutter="20">
+      <ElCol :xs="24" :md="12">
+        <ElCard shadow="hover">
+          <template #header>
+            <div style="display: flex; align-items: center; gap: 8px">
+              <Icon icon="ep:user" />
+              <span>Select User</span>
+            </div>
+          </template>
 
-        <ElFormItem label="Select Channels">
+          <ElForm label-width="120px">
+            <ElFormItem label="User">
+              <ElSelect v-model="selectedUser" placeholder="Choose user" style="width: 100%">
+                <ElOption
+                  v-for="user in users"
+                  :key="user.id"
+                  :label="user.username"
+                  :value="user.id"
+                />
+              </ElSelect>
+            </ElFormItem>
+          </ElForm>
+        </ElCard>
+      </ElCol>
+
+      <ElCol :xs="24" :md="12">
+        <ElCard shadow="hover">
+          <template #header>
+            <div style="display: flex; align-items: center; gap: 8px">
+              <Icon icon="ep:document-add" />
+              <span>Generate</span>
+            </div>
+          </template>
+
+          <ElButton type="primary" @click="generatePlaylist" :loading="loading" style="width: 100%">
+            <Icon icon="ep:document-add" />
+            Generate Playlist
+          </ElButton>
+
+          <div style="margin-top: 12px; font-size: 13px; color: #909399">
+            After generation, the playlist URL will be copied to clipboard.
+          </div>
+        </ElCard>
+      </ElCol>
+
+      <ElCol :xs="24" :md="24" style="margin-top: 20px">
+        <ElCard shadow="hover">
+          <template #header>
+            <div style="display: flex; align-items: center; justify-content: space-between">
+              <div style="display: flex; align-items: center; gap: 8px">
+                <Icon icon="ep:video-camera" />
+                <span>Select Channels</span>
+              </div>
+              <div style="font-size: 13px; color: #909399">
+                {{ selectedChannels.length }} selected
+              </div>
+            </div>
+          </template>
+
           <div style="margin-bottom: 12px">
             <ElRow :gutter="12">
-              <ElCol :span="14">
+              <ElCol :xs="24" :sm="16">
                 <ElSelect
                   v-model="selectedCategory"
                   placeholder="Select category to add all channels"
@@ -158,21 +205,19 @@ onMounted(() => {
                   />
                 </ElSelect>
               </ElCol>
-              <ElCol :span="10">
+              <ElCol :xs="24" :sm="8">
                 <ElButton type="primary" @click="selectByCategory" style="width: 100%">
                   <Icon icon="ep:plus" />
                   Add Category
                 </ElButton>
               </ElCol>
             </ElRow>
+
             <div style="margin-top: 8px">
               <ElButton size="small" @click="clearSelection">
                 <Icon icon="ep:delete" />
                 Clear All
               </ElButton>
-              <span style="margin-left: 12px; font-size: 13px; color: #909399">
-                {{ selectedChannels.length }} channels selected
-              </span>
             </div>
           </div>
 
@@ -188,23 +233,8 @@ onMounted(() => {
             }"
             style="width: 100%"
           />
-        </ElFormItem>
-
-        <ElFormItem>
-          <ElButton type="primary" @click="generatePlaylist" :loading="loading">
-            <Icon icon="ep:document-add" />
-            Generate Playlist
-          </ElButton>
-        </ElFormItem>
-      </ElForm>
-
-      <div style="margin-top: 24px; padding: 16px; background: #f5f7fa; border-radius: 4px">
-        <h4 style="margin: 0 0 8px 0; font-size: 14px">Generated Playlist:</h4>
-        <p style="margin: 0; font-size: 13px; color: #606266">
-          After generation, the playlist URL will be automatically copied to your clipboard. You can
-          share this URL with the selected user to access their custom channels.
-        </p>
-      </div>
-    </div>
+        </ElCard>
+      </ElCol>
+    </ElRow>
   </ContentWrap>
 </template>
