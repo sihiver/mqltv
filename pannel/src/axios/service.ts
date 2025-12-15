@@ -33,7 +33,7 @@ axiosInstance.interceptors.response.use(
     // 这里不能做任何处理，否则后面的 interceptors 拿不到完整的上下文了
     return res
   },
-  (error: AxiosError) => {
+  (error: AxiosError<any>) => {
     // Handle network errors safely
     if (error.response) {
       // Server responded with error status
@@ -44,7 +44,8 @@ axiosInstance.interceptors.response.use(
       } else if (status === 404) {
         ElMessage.error('Resource not found')
       } else {
-        ElMessage.error(error.response.data?.message || error.message || 'Request failed')
+        const responseData = error.response.data as any
+        ElMessage.error(responseData?.message || error.message || 'Request failed')
       }
     } else if (error.request) {
       // Request made but no response (network error)

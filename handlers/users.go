@@ -308,8 +308,8 @@ func ToggleUserStatus(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"code":      0,
-		"message":   fmt.Sprintf("User %s successfully", statusText),
+		"code":    0,
+		"message": fmt.Sprintf("User %s successfully", statusText),
 		"data": map[string]interface{}{
 			"is_active": newStatus,
 		},
@@ -719,7 +719,7 @@ func GenerateUserPlaylist(w http.ResponseWriter, r *http.Request) {
 		AND output_path IN (
 			SELECT 'channel-' || c.id 
 			FROM channels c 
-			WHERE c.id IN (` + strings.Join(placeholders, ",") + `)
+			WHERE c.id IN (`+strings.Join(placeholders, ",")+`)
 		)
 	`, args...)
 	if err == nil {
@@ -730,7 +730,7 @@ func GenerateUserPlaylist(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		oldRelayRows.Close()
-		
+
 		// Delete old relays
 		for _, path := range oldRelayPaths {
 			database.DB.Exec("DELETE FROM relays WHERE output_path = ?", path)
@@ -739,16 +739,13 @@ func GenerateUserPlaylist(w http.ResponseWriter, r *http.Request) {
 
 	// Build M3U content
 	m3uContent := "#EXTM3U\n"
-	host := os.Getenv("HOST")
-	if host == "" {
-		host = "localhost:8080"
-	}
+	baseURL := publicBaseURL(r)
 
 	channelCount := 0
 	for _, ch := range channelsData {
 		// Create or get relay for this channel
 		relayPath := fmt.Sprintf("channel-%d", ch.ID)
-		
+
 		// Check if relay exists, if not create it
 		var relayID int
 		err := database.DB.QueryRow("SELECT id FROM relays WHERE output_path = ?", relayPath).Scan(&relayID)
@@ -767,8 +764,8 @@ func GenerateUserPlaylist(w http.ResponseWriter, r *http.Request) {
 
 		m3uContent += fmt.Sprintf("#EXTINF:-1 tvg-id=\"%d\" tvg-name=\"%s\" tvg-logo=\"%s\" group-title=\"%s\",%s\n",
 			ch.ID, ch.Name, ch.Logo, ch.Group, ch.Name)
-		m3uContent += fmt.Sprintf("http://%s/stream/%s?username=%s&password=%s\n",
-			host, relayPath, user.Username, user.Password)
+		m3uContent += fmt.Sprintf("%s/stream/%s?username=%s&password=%s\n",
+			baseURL, relayPath, user.Username, user.Password)
 		channelCount++
 	}
 

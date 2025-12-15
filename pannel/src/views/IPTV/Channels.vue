@@ -22,10 +22,10 @@ import { ref, computed, onMounted, onUnmounted, watchEffect, watch, nextTick } f
 import request from '@/axios'
 import Hls from 'hls.js'
 
-const channels = ref([])
+const channels = ref<any[]>([])
 const activeChannelIds = ref<Set<number>>(new Set())
-const categories = ref([])
-const playlists = ref([])
+const categories = ref<string[]>([])
+const playlists = ref<any[]>([])
 const searchQuery = ref('')
 const selectedCategory = ref('')
 const selectedChannels = ref<Set<number>>(new Set())
@@ -46,6 +46,13 @@ const formData = ref({
   url: '',
   logo: '',
   group_name: ''
+})
+
+// Rename category dialog state
+const renameDialogVisible = ref(false)
+const renameForm = ref({
+  old_name: '',
+  new_name: ''
 })
 
 // Playback dialog state
@@ -136,37 +143,6 @@ const loadChannels = async () => {
     ElMessage.error('Failed to load channels')
   } finally {
     loading.value = false
-  }
-}
-
-const toggleChannel = async (channel: any) => {
-  try {
-    await request.post({ url: `/api/channels/${channel.id}/toggle` })
-    channel.enabled = !channel.enabled
-    ElMessage.success(`Channel ${channel.enabled ? 'enabled' : 'disabled'}`)
-  } catch (error) {
-    ElMessage.error('Failed to toggle channel')
-  }
-}
-
-const deleteChannel = async (channel: any) => {
-  try {
-    await ElMessageBox.confirm(`Delete channel "${channel.name}"?`, 'Confirm', {
-      confirmButtonText: 'Delete',
-      cancelButtonText: 'Cancel',
-      type: 'warning'
-    })
-
-    await request.delete({ url: `/api/channels/${channel.id}` })
-
-    // Instant UI update - remove deleted channel
-    channels.value = channels.value.filter((ch: any) => ch.id !== channel.id)
-
-    ElMessage.success('Channel deleted successfully')
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error('Failed to delete channel')
-    }
   }
 }
 
@@ -313,7 +289,7 @@ const initPlayer = () => {
       })
     })
 
-    hls.on(Hls.Events.ERROR, (event, data) => {
+    hls.on(Hls.Events.ERROR, (_event, data) => {
       console.error('HLS error:', data)
       if (data.fatal) {
         switch (data.type) {
@@ -483,6 +459,76 @@ const handleBatchDelete = async () => {
   }
 }
 
+const openRenameCategory = () => {
+  if (!selectedCategory.value) {
+    ElMessage.warning('Please select a category first')
+    return
+  }
+
+  renameForm.value = {
+    old_name: selectedCategory.value,
+    new_name: selectedCategory.value
+  }
+  renameDialogVisible.value = true
+}
+
+const submitRenameCategory = async () => {
+  const oldName = (renameForm.value.old_name || '').trim()
+  const newName = (renameForm.value.new_name || '').trim()
+
+  if (!oldName || !newName) {
+    ElMessage.warning('Old and new category names are required')
+    return
+  }
+
+  if (oldName === newName) {
+    renameDialogVisible.value = false
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(`Rename category "${oldName}" to "${newName}"?`, 'Confirm', {
+      confirmButtonText: 'Rename',
+      cancelButtonText: 'Cancel',
+      type: 'warning'
+    })
+
+    await request.post({
+      url: '/api/channels/rename-category',
+      data: { old_name: oldName, new_name: newName }
+    })
+
+    // Update local channels list
+    channels.value = channels.value.map((ch: any) => {
+      if (ch.category === oldName) {
+        return { ...ch, category: newName, group_name: newName }
+      }
+      return ch
+    })
+
+    // Update categories list
+    categories.value = Array.from(
+      new Set(
+        (categories.value as any[])
+          .filter((c) => c !== oldName)
+          .concat([newName])
+          .filter((c) => !!c)
+      )
+    ).sort() as any
+
+    if (selectedCategory.value === oldName) {
+      selectedCategory.value = newName
+    }
+
+    renameDialogVisible.value = false
+    ElMessage.success('Category renamed successfully')
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('Failed to rename category')
+    }
+  }
+}
+
 let activeChannelsInterval: any = null
 
 onMounted(() => {
@@ -542,6 +588,10 @@ onUnmounted(() => {
           <ElButton type="primary" @click="handleCreate">
             <Icon icon="ep:plus" />
             Add Channel
+          </ElButton>
+          <ElButton :disabled="!selectedCategory" @click="openRenameCategory">
+            <Icon icon="ep:edit" />
+            Rename Category
           </ElButton>
           <ElButton
             type="danger"
@@ -671,6 +721,23 @@ onUnmounted(() => {
       <template #footer>
         <ElButton @click="dialogVisible = false">Cancel</ElButton>
         <ElButton type="primary" @click="handleSave">Save</ElButton>
+      </template>
+    </ElDialog>
+
+    <!-- Rename Category Dialog -->
+    <ElDialog v-model="renameDialogVisible" title="Rename Category" width="520px">
+      <ElForm :model="renameForm" label-width="140px">
+        <ElFormItem label="Old Category">
+          <ElInput v-model="renameForm.old_name" disabled />
+        </ElFormItem>
+        <ElFormItem label="New Category" required>
+          <ElInput v-model="renameForm.new_name" placeholder="Enter new category name" />
+        </ElFormItem>
+      </ElForm>
+
+      <template #footer>
+        <ElButton @click="renameDialogVisible = false">Cancel</ElButton>
+        <ElButton type="primary" @click="submitRenameCategory">Rename</ElButton>
       </template>
     </ElDialog>
 

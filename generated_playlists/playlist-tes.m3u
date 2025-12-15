@@ -1,49 +1,83 @@
 #EXTM3U
-# IPTV Playlist for: tes
-# Generated: 9/12/2025, 16.52.21
-# Total Channels: 22
-
-#EXTINF:-1 tvg-id="6141" tvg-name="ANTV" group-title="LOKAL INDONESIA™",ANTV
-http://localhost:8080/api/proxy/channel/6141?username=tes&password=tes
-#EXTINF:-1 tvg-id="6240" tvg-name="Bali TV" group-title="LOKAL INDONESIA™",Bali TV
-http://localhost:8080/api/proxy/channel/6240?username=tes&password=tes
-#EXTINF:-1 tvg-id="6541" tvg-name="GTV" group-title="LOKAL INDONESIA™",GTV
-http://localhost:8080/api/proxy/channel/6541?username=tes&password=tes
-#EXTINF:-1 tvg-id="6660" tvg-name="Indosiar" group-title="LOKAL INDONESIA™",Indosiar
-http://localhost:8080/api/proxy/channel/6660?username=tes&password=tes
-#EXTINF:-1 tvg-id="6661" tvg-name="Indosiar (Sport)" group-title="LOKAL INDONESIA™",Indosiar (Sport)
-http://localhost:8080/api/proxy/channel/6661?username=tes&password=tes
-#EXTINF:-1 tvg-id="6748" tvg-name="Kompas tv" group-title="LOKAL INDONESIA™",Kompas tv
-http://localhost:8080/api/proxy/channel/6748?username=tes&password=tes
-#EXTINF:-1 tvg-id="6795" tvg-name="METRO TV HD" group-title="LOKAL INDONESIA™",METRO TV HD
-http://localhost:8080/api/proxy/channel/6795?username=tes&password=tes
-#EXTINF:-1 tvg-id="6796" tvg-name="MNC TV" group-title="LOKAL INDONESIA™",MNC TV
-http://localhost:8080/api/proxy/channel/6796?username=tes&password=tes
-#EXTINF:-1 tvg-id="6837" tvg-name="Moji TV" group-title="LOKAL INDONESIA™",Moji TV
-http://localhost:8080/api/proxy/channel/6837?username=tes&password=tes
-#EXTINF:-1 tvg-id="6880" tvg-name="NET TV" group-title="LOKAL INDONESIA™",NET TV
-http://localhost:8080/api/proxy/channel/6880?username=tes&password=tes
-#EXTINF:-1 tvg-id="7007" tvg-name="RCTI" group-title="LOKAL INDONESIA™",RCTI
-http://localhost:8080/api/proxy/channel/7007?username=tes&password=tes
-#EXTINF:-1 tvg-id="7008" tvg-name="RCTI (Sport)" group-title="LOKAL INDONESIA™",RCTI (Sport)
-http://localhost:8080/api/proxy/channel/7008?username=tes&password=tes
-#EXTINF:-1 tvg-id="7017" tvg-name="RTV FHD" group-title="LOKAL INDONESIA™",RTV FHD
-http://localhost:8080/api/proxy/channel/7017?username=tes&password=tes
-#EXTINF:-1 tvg-id="7058" tvg-name="SCTV" group-title="LOKAL INDONESIA™",SCTV
-http://localhost:8080/api/proxy/channel/7058?username=tes&password=tes
-#EXTINF:-1 tvg-id="7059" tvg-name="SCTV (Sport)" group-title="LOKAL INDONESIA™",SCTV (Sport)
-http://localhost:8080/api/proxy/channel/7059?username=tes&password=tes
-#EXTINF:-1 tvg-id="7255" tvg-name="TV ONE" group-title="LOKAL INDONESIA™",TV ONE
-http://localhost:8080/api/proxy/channel/7255?username=tes&password=tes
-#EXTINF:-1 tvg-id="7262" tvg-name="TVRI" group-title="LOKAL INDONESIA™",TVRI
-http://localhost:8080/api/proxy/channel/7262?username=tes&password=tes
-#EXTINF:-1 tvg-id="7526" tvg-name="Trans 7" group-title="LOKAL INDONESIA™",Trans 7
-http://localhost:8080/api/proxy/channel/7526?username=tes&password=tes
-#EXTINF:-1 tvg-id="7527" tvg-name="Trans 7 Transmedia" group-title="LOKAL INDONESIA™",Trans 7 Transmedia
-http://localhost:8080/api/proxy/channel/7527?username=tes&password=tes
-#EXTINF:-1 tvg-id="7528" tvg-name="Trans TV" group-title="LOKAL INDONESIA™",Trans TV
-http://localhost:8080/api/proxy/channel/7528?username=tes&password=tes
-#EXTINF:-1 tvg-id="7529" tvg-name="Trans TV Transmedia" group-title="LOKAL INDONESIA™",Trans TV Transmedia
-http://localhost:8080/api/proxy/channel/7529?username=tes&password=tes
-#EXTINF:-1 tvg-id="7626" tvg-name="i News" group-title="LOKAL INDONESIA™",i News
-http://localhost:8080/api/proxy/channel/7626?username=tes&password=tes
+#EXTINF:-1 tvg-id="115" tvg-name="ANTV" tvg-logo="https://thumbor.prod.vidiocdn.com/45W5WeEJJyd4q_kNCsZBsDZvf1Q=/filters:strip_icc():quality(70)/vidio-web-prod-user/uploads/user/avatar/88855596/PROFILETVONE-ad494997ef15cf6d.jpg" group-title="LOKAL INDONESIA™",ANTV
+http://192.168.1.67:8080/stream/channel-115?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="121" tvg-name="Bali TV" tvg-logo="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQCi6fPl9htPxqaE1f2B9hZK9TXm6LrYPEEgA&s" group-title="LOKAL INDONESIA™",Bali TV
+http://192.168.1.67:8080/stream/channel-121?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="105" tvg-name="GTV" tvg-logo="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT-EehM8fz1VW8hKyeTEjD1aPc9Fu3RpH67Eg&s" group-title="LOKAL INDONESIA™",GTV
+http://192.168.1.67:8080/stream/channel-105?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="300" tvg-name="Indosiar" tvg-logo="http://goldenid.online:80/images/MuJ8fbAi_MkdxEgTx4Ih-1gLaqcgSkbejhA1LVB8e8ukTkzUhrsjswTPB9d3zJRiGhNQG7YekYBbrFJ5ec_pvw.png" group-title="LOKAL INDONESIA™",Indosiar
+http://192.168.1.67:8080/stream/channel-300?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="109" tvg-name="Indosiar (Sport)" tvg-logo="http://goldenid.online:80/images/MuJ8fbAi_MkdxEgTx4Ih-1gLaqcgSkbejhA1LVB8e8ukTkzUhrsjswTPB9d3zJRiGhNQG7YekYBbrFJ5ec_pvw.png" group-title="LOKAL INDONESIA™",Indosiar (Sport)
+http://192.168.1.67:8080/stream/channel-109?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="113" tvg-name="Kompas tv" tvg-logo="http://goldenid.online:80/images/KAts4CTlAHmisT2eFggVHj-jUikG-UwFiElWbJow-nhdIXVGCRET5gc68B_8WaQbmHjYXuyuSZzAYWIskIQTYMeZyXzJB_M4E3Ah6Pk3O14xqfOgB33cp24-NITHtsI5ncMPZ3Et7TdHj584PjEsyK5j6UHWNiut4zPiDNL1cvp9FIXvUkE205Kke87TwTiz.jpg" group-title="LOKAL INDONESIA™",Kompas tv
+http://192.168.1.67:8080/stream/channel-113?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="117" tvg-name="METRO TV HD" tvg-logo="http://goldenid.online:80/images/c2UotlQ1L6lyEyZz5xHNY9N4yEE04AslBSyS7Fj4VciykD7Oukt0W6Zfteug1LMFOVWE3AOau13ai65W_yxoQrvbjQdbtT33JX4Mo_1V1uw.png" group-title="LOKAL INDONESIA™",METRO TV HD
+http://192.168.1.67:8080/stream/channel-117?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="104" tvg-name="MNC TV" tvg-logo="http://goldenid.online:80/images/0eXynFBMWQjHfkx0379MZrDGEj5M1DQg4k-aOToZA1mHUHatl8sqWaKFe5pqBBJjv1oCunU9nfqtR48h2wYzXg.png" group-title="LOKAL INDONESIA™",MNC TV
+http://192.168.1.67:8080/stream/channel-104?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="119" tvg-name="Moji TV" tvg-logo="http://goldenid.online:80/images/uuhCT73pRsf8MG14YjRAJiS7qQ9qrlYY3BOIGsO6vAFgh7lv9oRZDd8xNaLIcamHrcToQ7zlTLoefWtWn3KN6okO5JlVGuoS6nLOMsl5DR7SxFin0S73UcFmQHmVj9D_JGM7TXbPd7mv-DXzKxeiEw.jpeg" group-title="LOKAL INDONESIA™",Moji TV
+http://192.168.1.67:8080/stream/channel-119?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="112" tvg-name="NET TV" tvg-logo="http://goldenid.online:80/images/Kanmk96vTt-hjZj_mC4RcPttLMlmeeoOsTOSXqs4fWXm360tfVL4n72DiGcqnmJjEM-uvp07OHeL3f6wXGCrsaBjtlugCyAnhpJFl-flPoEFBAf_55XripIuHrdNHt7-1OELNso9QtxVLwUTQhOZaCA3H2fGYstYqaQ8slVfgaQ.png" group-title="LOKAL INDONESIA™",NET TV
+http://192.168.1.67:8080/stream/channel-112?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="219" tvg-name="RCTI" tvg-logo="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh2hH6cKLWO2FqXKf93hERFqgM6s9xbTZgwUsCK9kb0ktZT6zrqqZvA1l32L4QKi_7G2Cfj5HPJ9B4iFsJukRaks4goecHUdfDCAODAORVxfAnsDXD5FKCfoDB1bZs5G-dxN9Uw8ZcE9cQ/s600/RCTI.png" group-title="LOKAL INDONESIA™",RCTI
+http://192.168.1.67:8080/stream/channel-219?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="103" tvg-name="RCTI (Sport)" tvg-logo="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh2hH6cKLWO2FqXKf93hERFqgM6s9xbTZgwUsCK9kb0ktZT6zrqqZvA1l32L4QKi_7G2Cfj5HPJ9B4iFsJukRaks4goecHUdfDCAODAORVxfAnsDXD5FKCfoDB1bZs5G-dxN9Uw8ZcE9cQ/s600/RCTI.png" group-title="LOKAL INDONESIA™",RCTI (Sport)
+http://192.168.1.67:8080/stream/channel-103?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="118" tvg-name="RTV FHD" tvg-logo="http://goldenid.online:80/images/wtFA9pMcOn8VXZ_8fSjA4qfEGmMxxkWMhXnfInRK1v9NDBIiYpJv4XBjX31vy8FdeAREcyYmpTOcyXvd4Mye_qoFt_Lb45DFUSZMJJQ5xHM.jpg" group-title="LOKAL INDONESIA™",RTV FHD
+http://192.168.1.67:8080/stream/channel-118?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="111" tvg-name="SCTV" tvg-logo="https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcQhRgMGuo5tkNsUW9BDLl6keD_aCwytJSKnjBINOsqFnFCFFNmW" group-title="LOKAL INDONESIA™",SCTV
+http://192.168.1.67:8080/stream/channel-111?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="110" tvg-name="SCTV (Sport)" tvg-logo="http://goldenid.online:80/images/tcjBMuCD8M_zcpZuORRWzQaYp7zEO9FwxtiAOPLVkkeHoXsM3OMv1Soyy_zVhetNQGGOwDN5f7plivdrmFqc8D4VtawLxuvdtiEPImRdkT8tnmf6C4D4gywh1C5qH45ueKXi0iRoQVj8_x7qTM2YRA.jpeg" group-title="LOKAL INDONESIA™",SCTV (Sport)
+http://192.168.1.67:8080/stream/channel-110?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="116" tvg-name="TV ONE" tvg-logo="https://thumbor.prod.vidiocdn.com/kdj7v6XCX9C4UeOv6anzUgPtIB8=/filters:strip_icc():quality(70)/vidio-web-prod-user/uploads/user/avatar/88855732/PROFILETVONE-1-e4d30ebee473657b.png" group-title="LOKAL INDONESIA™",TV ONE
+http://192.168.1.67:8080/stream/channel-116?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="114" tvg-name="TVRI" tvg-logo="https://yt3.googleusercontent.com/ytc/AIdro_mhUyV8iNg5d_3sAtlPxTioVDSu2YBHr0CnFZdgqd6sJUk=s900-c-k-c0x00ffffff-no-rj" group-title="LOKAL INDONESIA™",TVRI
+http://192.168.1.67:8080/stream/channel-114?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="107" tvg-name="Trans 7" tvg-logo="https://www.dropbox.com/scl/fi/csmtr3nvtk4kovqboua10/logo-trans7.png?rlkey=obg6f7jeqa3po1qbm0gg6y59p&st=84hwezqm&dl=1" group-title="LOKAL INDONESIA™",Trans 7
+http://192.168.1.67:8080/stream/channel-107?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="199" tvg-name="Trans 7 Transmedia" tvg-logo="https://www.dropbox.com/scl/fi/csmtr3nvtk4kovqboua10/logo-trans7.png?rlkey=obg6f7jeqa3po1qbm0gg6y59p&st=84hwezqm&dl=1" group-title="LOKAL INDONESIA™",Trans 7 Transmedia
+http://192.168.1.67:8080/stream/channel-199?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="108" tvg-name="Trans TV" tvg-logo="https://scontent.fkno6-1.fna.fbcdn.net/v/t39.30808-6/491958870_1320388576121056_722558272581708029_n.jpg?_nc_cat=1&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeGclKuRG8UnOEmuuiLtvqxwz1ZtYuIbK5zPVm1i4hsrnJRVhXqPFt89YGXQm3Y7Dq6Brp71YqbY5UNr2YDELPJd&_nc_ohc=5ySPksr-r3YQ7kNvwHCKF8z&_nc_oc=AdmjASzvwbpDGaPXN1_mXxFtSI8bAIA2vdQRFr0sy7bTNKYdNef1ey2V6udMfsRSCVI&_nc_zt=23&_nc_ht=scontent.fkno6-1.fna&_nc_gid=0R-8SbmfJvPWJI9cm-FqMA&oh=00_AfJu0DfK8dXaa_zQxIGgLEDI5KBmm6hKCNvvFUc4-EA8JQ&oe=682894CA" group-title="LOKAL INDONESIA™",Trans TV
+http://192.168.1.67:8080/stream/channel-108?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="200" tvg-name="Trans TV Transmedia" tvg-logo="https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcQtIfkQ7F3PDmDIbeshisfZE83hMZO87drglKfEmPVwD9cqff0Y" group-title="LOKAL INDONESIA™",Trans TV Transmedia
+http://192.168.1.67:8080/stream/channel-200?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="106" tvg-name="i News" tvg-logo="https://media.licdn.com/dms/image/v2/C510BAQEDNZ0BcKErOg/company-logo_200_200/company-logo_200_200/0/1631419517461/sindotv_logo?e=2147483647&v=beta&t=2mx6P3l2c8MwSXgOi-eQ3KT788ZU_wxKN7CSvggF8QE" group-title="LOKAL INDONESIA™",i News
+http://192.168.1.67:8080/stream/channel-106?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="46" tvg-name="CCM" tvg-logo="https://static.wikia.nocookie.net/logopedia/images/b/b8/CCM_new_Logo.png/revision/latest?cb=20190603053700" group-title="movie",CCM
+http://192.168.1.67:8080/stream/channel-46?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="41" tvg-name="Celestial Movie" tvg-logo="http://goldenid.online:80/images/545da4ef156272730a6079cd7ff55947.png" group-title="movie",Celestial Movie
+http://192.168.1.67:8080/stream/channel-41?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="25" tvg-name="Cinemax" tvg-logo="http://goldenid.online:80/images/bda7b2deb6fea32e9321f9f9809bec3f.png" group-title="movie",Cinemax
+http://192.168.1.67:8080/stream/channel-25?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="42" tvg-name="Flik" tvg-logo="http://goldenid.online:80/images/a9bf542fb4804d4c035d23b473b030fd.png" group-title="movie",Flik
+http://192.168.1.67:8080/stream/channel-42?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="43" tvg-name="Galaxy" tvg-logo="http://goldenid.online:80/images/460ed0b23d192363cba7563b04bf0240.png" group-title="movie",Galaxy
+http://192.168.1.67:8080/stream/channel-43?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="44" tvg-name="Galaxy Premium" tvg-logo="http://goldenid.online:80/images/8feba044e918d385625dd387e77c6816.png" group-title="movie",Galaxy Premium
+http://192.168.1.67:8080/stream/channel-44?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="49" tvg-name="HBO" tvg-logo="http://goldenid.online:80/images/cc7905b85b7f59c40e5e8f4ff07ed1e2.png" group-title="movie",HBO
+http://192.168.1.67:8080/stream/channel-49?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="51" tvg-name="HBO Family" tvg-logo="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTCLRxnJulVBGcchmgaMeKmPCn72HOYdkgPoW3b39VKplL07Fvy" group-title="movie",HBO Family
+http://192.168.1.67:8080/stream/channel-51?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="52" tvg-name="HBO Hits" tvg-logo="http://goldenid.online:80/images/2b4c3351149ed6e0b91a1e2f1fb75676.png" group-title="movie",HBO Hits
+http://192.168.1.67:8080/stream/channel-52?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="50" tvg-name="HBO Signature" tvg-logo="http://goldenid.online:80/images/6867150b946b58656e48a4074b181a40.png" group-title="movie",HBO Signature
+http://192.168.1.67:8080/stream/channel-50?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="66" tvg-name="Hits" tvg-logo="https://play-lh.googleusercontent.com/jxQiD0gAUcz-eaFflMdX2xQFQ9itzOd2VFC-oIpOIO9BhkEORi5p7XIMW-x0zm9lmg" group-title="movie",Hits
+http://192.168.1.67:8080/stream/channel-66?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="62" tvg-name="Hits Movies" tvg-logo="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRPUAeRnuJuR9fYQ9_VPzaRQAKbDIFGP-FPUMs8PcN_2EjkOrJh" group-title="movie",Hits Movies
+http://192.168.1.67:8080/stream/channel-62?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="47" tvg-name="IMC" tvg-logo="http://goldenid.online:80/images/c25e870a6652ed0ff77b8d53bf75680a.png" group-title="movie",IMC
+http://192.168.1.67:8080/stream/channel-47?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="48" tvg-name="Kix" tvg-logo="https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcSY2wOIPlMic383bsCu1sh34aMkJdcudVZIEkeyY44OZrHq3SUp" group-title="movie",Kix
+http://192.168.1.67:8080/stream/channel-48?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="71" tvg-name="My Cinema" tvg-logo="http://goldenid.online:80/images/9f4109b0351b0e0007c801a7496e6c45.png" group-title="movie",My Cinema
+http://192.168.1.67:8080/stream/channel-71?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="65" tvg-name="My Family" tvg-logo="http://goldenid.online:80/images/840ccb748d9bb7bf9d78d8758f6897a1.jpg" group-title="movie",My Family
+http://192.168.1.67:8080/stream/channel-65?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="40" tvg-name="Thrill" tvg-logo="http://goldenid.online:80/images/fb047b86e86fba63a30664f010bca3dd.png" group-title="movie",Thrill
+http://192.168.1.67:8080/stream/channel-40?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="64" tvg-name="Warner Bros" tvg-logo="http://goldenid.online:80/images/d2aef73ce71b27e36ba0d9f5e78be6b2.png" group-title="movie",Warner Bros
+http://192.168.1.67:8080/stream/channel-64?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780
+#EXTINF:-1 tvg-id="45" tvg-name="Zee Bioskop" tvg-logo="http://goldenid.online:80/images/a0868be4e009f90bbba8e11b7f69eafa.png" group-title="movie",Zee Bioskop
+http://192.168.1.67:8080/stream/channel-45?username=tes&password=28b662d883b6d76fd96e4ddc5e9ba780

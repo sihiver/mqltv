@@ -1,8 +1,8 @@
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																			package handlers
+package handlers
 
 import (
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																				"bufio"
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																				"bytes"
+	"bufio"
+	"bytes"
 	"crypto/md5"
 	"database/sql"
 	"encoding/json"
@@ -14,7 +14,7 @@ import (
 	"iptv-panel/streaming"
 	"log"
 	"net/http"
-																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																				"net/url"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -134,7 +134,7 @@ func GetChannels(w http.ResponseWriter, r *http.Request) {
 	var channels []models.Channel
 	for rows.Next() {
 		var c models.Channel
-		if err := rows.Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, 
+		if err := rows.Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group,
 			&c.Active, &c.CreatedAt); err != nil {
 			continue
 		}
@@ -209,8 +209,8 @@ func RefreshPlaylist(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"code":    0,
-		"message": "Playlist refreshed successfully",
+		"code":           0,
+		"message":        "Playlist refreshed successfully",
 		"channels_count": channelCount,
 	})
 }
@@ -235,7 +235,7 @@ func UpdatePlaylist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := database.DB.Exec("UPDATE playlists SET name = ?, url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", 
+	_, err := database.DB.Exec("UPDATE playlists SET name = ?, url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
 		req.Name, req.URL, playlistID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -355,7 +355,7 @@ func StreamRelay(w http.ResponseWriter, r *http.Request) {
 	// Authenticate user
 	username := r.URL.Query().Get("username")
 	password := r.URL.Query().Get("password")
-	
+
 	if username == "" || password == "" {
 		http.Error(w, "Authentication required: username and password parameters missing", http.StatusUnauthorized)
 		return
@@ -366,13 +366,13 @@ func StreamRelay(w http.ResponseWriter, r *http.Request) {
 	var userID int
 	var isActive bool
 	var expiresAt sql.NullTime
-	
+
 	err := database.DB.QueryRow(`
 		SELECT id, is_active, expires_at 
 		FROM users 
 		WHERE username = ? AND password = ?
 	`, username, password).Scan(&userID, &isActive, &expiresAt)
-	
+
 	if err == sql.ErrNoRows {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
@@ -380,12 +380,12 @@ func StreamRelay(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	if !isActive {
 		ServeExpiredImage(w, r)
 		return
 	}
-	
+
 	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
 		ServeExpiredImage(w, r)
 		return
@@ -494,12 +494,7 @@ func ExportM3U(w http.ResponseWriter, r *http.Request) {
 
 	w.Write([]byte("#EXTM3U\n"))
 
-	// Get host for proxy URLs
-	scheme := "http"
-	host := r.Host
-	if host == "" {
-		host = "localhost:8080"
-	}
+	baseURL := publicBaseURL(r)
 
 	for rows.Next() {
 		var channelID int
@@ -518,7 +513,7 @@ func ExportM3U(w http.ResponseWriter, r *http.Request) {
 		info += "," + name + "\n"
 
 		// Export URL proxy panel via FFmpeg, bukan URL asli provider
-		proxyURL := fmt.Sprintf("%s://%s/api/proxy/channel/%d", scheme, host, channelID)
+		proxyURL := fmt.Sprintf("%s/api/proxy/channel/%d", baseURL, channelID)
 
 		w.Write([]byte(info))
 		w.Write([]byte(proxyURL + "\n"))
@@ -657,13 +652,90 @@ func BatchDeleteChannels(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// RenameChannelCategory renames a category (group_name) for all matching channels.
+func RenameChannelCategory(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		OldName    string `json:"old_name"`
+		NewName    string `json:"new_name"`
+		PlaylistID int    `json:"playlist_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"data":    nil,
+			"message": "Invalid request body",
+		})
+		return
+	}
+
+	oldName := strings.TrimSpace(req.OldName)
+	newName := strings.TrimSpace(req.NewName)
+
+	if oldName == "" || newName == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"data":    nil,
+			"message": "old_name and new_name are required",
+		})
+		return
+	}
+
+	if oldName == newName {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code": 0,
+			"data": map[string]interface{}{
+				"success": true,
+				"updated": 0,
+			},
+			"message": "No changes",
+		})
+		return
+	}
+
+	query := "UPDATE channels SET group_name = ? WHERE group_name = ?"
+	args := []interface{}{newName, oldName}
+	if req.PlaylistID > 0 {
+		query += " AND playlist_id = ?"
+		args = append(args, req.PlaylistID)
+	}
+
+	result, err := database.DB.Exec(query, args...)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"data":    nil,
+			"message": "Failed to rename category",
+		})
+		return
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code": 0,
+		"data": map[string]interface{}{
+			"success":  true,
+			"updated":  rowsAffected,
+			"old_name": oldName,
+			"new_name": newName,
+		},
+		"message": fmt.Sprintf("Renamed %d channels", rowsAffected),
+	})
+}
+
 // SearchChannels searches channels by name
 func SearchChannels(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
-	
+
 	var rows *sql.Rows
 	var err error
-	
+
 	if query == "" {
 		// If no query, return all active channels with playlist info
 		rows, err = database.DB.Query(`
@@ -685,7 +757,7 @@ func SearchChannels(w http.ResponseWriter, r *http.Request) {
 			LIMIT 5000
 		`, "%"+query+"%")
 	}
-	
+
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -699,7 +771,7 @@ func SearchChannels(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, &c.Active, &c.CreatedAt, &playlistName); err != nil {
 			continue
 		}
-		
+
 		channel := map[string]interface{}{
 			"id":            c.ID,
 			"playlist_id":   c.PlaylistID,
@@ -713,11 +785,11 @@ func SearchChannels(w http.ResponseWriter, r *http.Request) {
 			"created_at":    c.CreatedAt,
 			"playlist_name": "",
 		}
-		
+
 		if playlistName.Valid {
 			channel["playlist_name"] = playlistName.String
 		}
-		
+
 		channels = append(channels, channel)
 	}
 
@@ -760,7 +832,7 @@ func CreateChannel(w http.ResponseWriter, r *http.Request) {
 		"INSERT INTO channels (playlist_id, name, url, logo, group_name, active) VALUES (?, ?, ?, ?, ?, 1)",
 		req.PlaylistID, req.Name, req.URL, req.Logo, req.GroupName,
 	)
-	
+
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -804,7 +876,7 @@ func CreateChannel(w http.ResponseWriter, r *http.Request) {
 		"created_at":    c.CreatedAt,
 		"playlist_name": "",
 	}
-	
+
 	if playlistName.Valid {
 		channel["playlist_name"] = playlistName.String
 	}
@@ -851,7 +923,7 @@ func UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		"UPDATE channels SET name = ?, url = ?, logo = ?, group_name = ? WHERE id = ?",
 		req.Name, req.URL, req.Logo, req.GroupName, channelID,
 	)
-	
+
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -893,7 +965,7 @@ func UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		"created_at":    c.CreatedAt,
 		"playlist_name": "",
 	}
-	
+
 	if playlistName.Valid {
 		channel["playlist_name"] = playlistName.String
 	}
@@ -946,12 +1018,12 @@ func GetRecentlyWatchedChannels(w http.ResponseWriter, r *http.Request) {
 		ORDER BY last_watched DESC
 		LIMIT 10
 	`)
-	
+
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"code": 1,
-			"data": nil,
+			"code":    1,
+			"data":    nil,
 			"message": "Failed to load recently watched: " + err.Error(),
 		})
 		return
@@ -965,12 +1037,12 @@ func GetRecentlyWatchedChannels(w http.ResponseWriter, r *http.Request) {
 		var createdAt time.Time
 		var playlistName sql.NullString
 		var lastWatchedStr string
-		
+
 		if err := rows.Scan(&id, &playlistID, &name, &url, &logo, &groupName, &active, &createdAt, &playlistName, &lastWatchedStr); err != nil {
 			log.Printf("Error scanning recently watched row: %v", err)
 			continue
 		}
-		
+
 		channel := map[string]interface{}{
 			"id":            id,
 			"playlist_id":   playlistID,
@@ -985,11 +1057,11 @@ func GetRecentlyWatchedChannels(w http.ResponseWriter, r *http.Request) {
 			"playlist_name": "",
 			"last_watched":  lastWatchedStr,
 		}
-		
+
 		if playlistName.Valid {
 			channel["playlist_name"] = playlistName.String
 		}
-		
+
 		channels = append(channels, channel)
 	}
 
@@ -1018,12 +1090,12 @@ func GetActiveChannelsWithViewers(w http.ResponseWriter, r *http.Request) {
 		GROUP BY c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at, p.name
 		ORDER BY viewer_count DESC
 	`)
-	
+
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"code": 1,
-			"data": nil,
+			"code":    1,
+			"data":    nil,
 			"message": "Failed to load active channels: " + err.Error(),
 		})
 		return
@@ -1036,12 +1108,12 @@ func GetActiveChannelsWithViewers(w http.ResponseWriter, r *http.Request) {
 		var name, url, logo, groupName string
 		var createdAt time.Time
 		var playlistName sql.NullString
-		
+
 		if err := rows.Scan(&id, &playlistID, &name, &url, &logo, &groupName, &active, &createdAt, &playlistName, &viewerCount); err != nil {
 			log.Printf("Error scanning active channel row: %v", err)
 			continue
 		}
-		
+
 		channel := map[string]interface{}{
 			"id":            id,
 			"playlist_id":   playlistID,
@@ -1056,11 +1128,11 @@ func GetActiveChannelsWithViewers(w http.ResponseWriter, r *http.Request) {
 			"playlist_name": "",
 			"viewer_count":  viewerCount,
 		}
-		
+
 		if playlistName.Valid {
 			channel["playlist_name"] = playlistName.String
 		}
-		
+
 		channels = append(channels, channel)
 	}
 
@@ -1089,7 +1161,7 @@ func ProxyChannel(w http.ResponseWriter, r *http.Request) {
 	// Authenticate user
 	username := r.URL.Query().Get("username")
 	password := r.URL.Query().Get("password")
-	
+
 	if username == "" || password == "" {
 		http.Error(w, "Authentication required: username and password parameters missing", http.StatusUnauthorized)
 		return
@@ -1100,13 +1172,13 @@ func ProxyChannel(w http.ResponseWriter, r *http.Request) {
 	var userID int
 	var isActive bool
 	var expiresAt sql.NullTime
-	
+
 	err = database.DB.QueryRow(`
 		SELECT id, is_active, expires_at 
 		FROM users 
 		WHERE username = ? AND password = ?
 	`, username, passwordHash).Scan(&userID, &isActive, &expiresAt)
-	
+
 	if err == sql.ErrNoRows {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
@@ -1114,12 +1186,12 @@ func ProxyChannel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	if !isActive {
 		ServeExpiredImage(w, r)
 		return
 	}
-	
+
 	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
 		ServeExpiredImage(w, r)
 		return
@@ -1189,7 +1261,7 @@ func StreamRelayHLS(w http.ResponseWriter, r *http.Request) {
 	// Authenticate user
 	username := r.URL.Query().Get("username")
 	password := r.URL.Query().Get("password")
-	
+
 	if username == "" || password == "" {
 		http.Error(w, "Authentication required: username and password parameters missing", http.StatusUnauthorized)
 		return
@@ -1200,13 +1272,13 @@ func StreamRelayHLS(w http.ResponseWriter, r *http.Request) {
 	var userID int
 	var isActive bool
 	var expiresAt sql.NullTime
-	
+
 	err := database.DB.QueryRow(`
 		SELECT id, is_active, expires_at 
 		FROM users 
 		WHERE username = ? AND password = ?
 	`, username, passwordHash).Scan(&userID, &isActive, &expiresAt)
-	
+
 	if err == sql.ErrNoRows {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
@@ -1214,12 +1286,12 @@ func StreamRelayHLS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	if !isActive {
 		ServeExpiredImage(w, r)
 		return
 	}
-	
+
 	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
 		ServeExpiredImage(w, r)
 		return
@@ -1299,7 +1371,7 @@ func StreamRelayHLSSegment(w http.ResponseWriter, r *http.Request) {
 
 	var urls []string
 	json.Unmarshal([]byte(sourceURLs), &urls)
-	
+
 	if len(urls) > 0 {
 		// Try to construct segment URL from base URL
 		baseURL := urls[0]
@@ -1311,7 +1383,7 @@ func StreamRelayHLSSegment(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		segmentURL := baseURL[:lastSlash+1] + segment
-		
+
 		// Proxy the segment
 		resp, err := http.Get(segmentURL)
 		if err != nil {
@@ -1323,7 +1395,7 @@ func StreamRelayHLSSegment(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "video/MP2T")
 		w.Header().Set("Cache-Control", "max-age=10")
 		w.WriteHeader(resp.StatusCode)
-		
+
 		buffer := make([]byte, 32*1024)
 		for {
 			n, err := resp.Body.Read(buffer)
@@ -1348,7 +1420,7 @@ func GetStreamStatus(w http.ResponseWriter, r *http.Request) {
 	status := make([]map[string]interface{}, 0, len(sessions))
 	var totalBytesRead uint64
 	var totalBytesWritten uint64
-	
+
 	for _, session := range sessions {
 		stats := session.GetStats()
 		// Only include active sessions with clients
@@ -1405,7 +1477,7 @@ func ProxyChannelHLS(w http.ResponseWriter, r *http.Request) {
 	// Authenticate user
 	username := r.URL.Query().Get("username")
 	password := r.URL.Query().Get("password")
-	
+
 	if username == "" || password == "" {
 		http.Error(w, "Authentication required: username and password parameters missing", http.StatusUnauthorized)
 		return
@@ -1416,13 +1488,13 @@ func ProxyChannelHLS(w http.ResponseWriter, r *http.Request) {
 	var userID int
 	var isActive bool
 	var expiresAt sql.NullTime
-	
+
 	err = database.DB.QueryRow(`
 		SELECT id, is_active, expires_at 
 		FROM users 
 		WHERE username = ? AND password = ?
 	`, username, passwordHash).Scan(&userID, &isActive, &expiresAt)
-	
+
 	if err == sql.ErrNoRows {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
 		return
@@ -1430,12 +1502,12 @@ func ProxyChannelHLS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	
+
 	if !isActive {
 		ServeExpiredImage(w, r)
 		return
 	}
-	
+
 	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
 		ServeExpiredImage(w, r)
 		return
@@ -1536,16 +1608,16 @@ func SaveGeneratedPlaylist(w http.ResponseWriter, r *http.Request) {
 func ServeUserPlaylist(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	username := vars["user"]
-	
+
 	// Build file path
 	filePath := fmt.Sprintf("./generated_playlists/playlist-%s.m3u", username)
-	
+
 	// Check if file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		http.Error(w, "Playlist not found. Please generate playlist first.", http.StatusNotFound)
 		return
 	}
-	
+
 	// Serve file
 	w.Header().Set("Content-Type", "audio/x-mpegurl")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=playlist-%s.m3u", username))
@@ -1611,7 +1683,7 @@ func AdminPreviewChannel(w http.ResponseWriter, r *http.Request) {
 
 	// Copy headers from original request
 	req.Header.Set("User-Agent", "Mozilla/5.0")
-	
+
 	resp, err := client.Do(req)
 	if err != nil {
 		http.Error(w, "Failed to fetch stream", http.StatusBadGateway)

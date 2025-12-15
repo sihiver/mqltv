@@ -445,6 +445,25 @@ server {
 }
 ```
 
+### 7. Base URL Playlist (Dinamis)
+
+Saat generate playlist user (`/api/generate-playlist`), server membuat URL absolut untuk setiap stream.
+Base URL dipilih dengan prioritas berikut:
+
+1. `PUBLIC_BASE_URL` (contoh: `https://iptv.example.com`)
+2. Header reverse proxy: `X-Forwarded-Proto` + `X-Forwarded-Host`
+3. Env `HOST` (contoh: `iptv.example.com:8080`)
+4. `r.Host` dari request
+5. Default fallback: `localhost:8080`
+
+Jika hasil generate masih mengarah ke `http://localhost:8080/...`, set salah satu ini lalu generate ulang playlist:
+
+```bash
+export PUBLIC_BASE_URL="https://iptv.example.com"
+# atau
+export HOST="iptv.example.com:8080"
+```
+
 ### 6. Monitoring
 
 **Key Metrics:**
