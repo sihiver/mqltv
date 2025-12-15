@@ -65,7 +65,10 @@ const createUser = async () => {
 
     // Add new user to the list instantly
     if (res && res.data) {
-      users.value.unshift(res.data)
+      users.value.unshift({
+        ...res.data,
+        disabled: !res.data.is_active
+      })
     }
 
     ElMessage.success('User created successfully')
@@ -152,9 +155,9 @@ const toggleUserStatus = async (user: any) => {
   }
 }
 
-const getStatusType = (expiry: string) => {
-  if (!expiry) return 'info'
-  const expiryDate = new Date(expiry)
+const getStatusType = (expiresAt?: string | null) => {
+  if (!expiresAt) return 'info'
+  const expiryDate = new Date(expiresAt)
   const now = new Date()
 
   if (expiryDate < now) return 'danger'
@@ -165,9 +168,9 @@ const getStatusType = (expiry: string) => {
   return 'success'
 }
 
-const formatExpiry = (expiry: string) => {
-  if (!expiry) return 'No expiry'
-  const date = new Date(expiry)
+const formatExpiry = (expiresAt?: string | null) => {
+  if (!expiresAt) return 'No expiry'
+  const date = new Date(expiresAt)
   const now = new Date()
 
   if (date < now) return 'Expired'
@@ -204,8 +207,8 @@ onMounted(() => {
 
       <ElTableColumn label="Status" width="120">
         <template #default="{ row }">
-          <ElTag :type="getStatusType(row.expiry)">
-            {{ formatExpiry(row.expiry) }}
+          <ElTag :type="getStatusType(row.expires_at)">
+            {{ formatExpiry(row.expires_at) }}
           </ElTag>
         </template>
       </ElTableColumn>
