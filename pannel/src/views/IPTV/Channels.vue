@@ -246,8 +246,8 @@ const handleEdit = (row: any) => {
 
 const handlePlayback = (row: any) => {
   playbackChannel.value = row
-  // Use direct source URL instead of preview endpoint
-  playbackUrl.value = row.url
+  // Use backend preview proxy (avoids CORS and supports admin session auth)
+  playbackUrl.value = `/api/channels/${row.id}/preview`
   playbackDialogVisible.value = true
 
   // Initialize HLS player after dialog opens
@@ -267,7 +267,8 @@ const initPlayer = () => {
   }
 
   const streamUrl = playbackUrl.value
-  const isHLS = streamUrl.includes('.m3u8') || streamUrl.includes('m3u8')
+  const sourceUrl = playbackChannel.value?.url || ''
+  const isHLS = sourceUrl.includes('.m3u8') || sourceUrl.includes('m3u8')
 
   if (isHLS && Hls.isSupported()) {
     hls = new Hls({
@@ -275,7 +276,8 @@ const initPlayer = () => {
       lowLatencyMode: true,
       backBufferLength: 90,
       xhrSetup: function (xhr) {
-        xhr.withCredentials = false
+        // Preview endpoint is protected by admin session cookie
+        xhr.withCredentials = true
       }
     })
 

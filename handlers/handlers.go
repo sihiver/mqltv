@@ -1,6 +1,8 @@
 																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																			package handlers
 
 import (
+																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																				"bufio"
+																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																				"bytes"
 	"crypto/md5"
 	"database/sql"
 	"encoding/json"
@@ -12,6 +14,7 @@ import (
 	"iptv-panel/streaming"
 	"log"
 	"net/http"
+																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																				"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -1560,28 +1563,47 @@ func AdminPreviewChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get channel info
-	var sourceURL string
-	err = database.DB.QueryRow("SELECT url FROM channels WHERE id = ?", channelID).Scan(&sourceURL)
-	if err != nil {
-		http.Error(w, "Channel not found", http.StatusNotFound)
+	// Allow subsequent playlist/segment requests to be proxied via ?url=
+	targetURL := r.URL.Query().Get("url")
+	if targetURL == "" {
+		// Get channel info
+		err = database.DB.QueryRow("SELECT url FROM channels WHERE id = ?", channelID).Scan(&targetURL)
+		if err != nil {
+			http.Error(w, "Channel not found", http.StatusNotFound)
+			return
+		}
+	}
+
+	parsedTarget, err := url.Parse(targetURL)
+	if err != nil || parsedTarget.Scheme == "" || parsedTarget.Host == "" {
+		http.Error(w, "Invalid target URL", http.StatusBadRequest)
+		return
+	}
+	if parsedTarget.Scheme != "http" && parsedTarget.Scheme != "https" {
+		http.Error(w, "Unsupported URL scheme", http.StatusBadRequest)
 		return
 	}
 
-	// Set CORS headers
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	// Set CORS headers (dev + prod)
+	origin := r.Header.Get("Origin")
+	if origin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	} else {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+	}
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
 	// Proxy the stream directly
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: 0,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse // Don't follow redirects
 		},
 	}
 
-	req, err := http.NewRequest("GET", sourceURL, nil)
+	req, err := http.NewRequest("GET", targetURL, nil)
 	if err != nil {
 		http.Error(w, "Failed to create request", http.StatusInternalServerError)
 		return
@@ -1596,6 +1618,63 @@ func AdminPreviewChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer resp.Body.Close()
+
+	// If this is an HLS playlist, rewrite its URIs so the browser fetches everything through this endpoint.
+	contentType := strings.ToLower(resp.Header.Get("Content-Type"))
+	looksLikePlaylist := strings.Contains(strings.ToLower(targetURL), ".m3u8") ||
+		strings.Contains(contentType, "mpegurl") ||
+		strings.Contains(contentType, "application/vnd.apple.mpegurl") ||
+		strings.Contains(contentType, "application/x-mpegurl")
+
+	if looksLikePlaylist {
+		limited := io.LimitReader(resp.Body, 1024*1024) // 1MB max for playlist
+		bodyBytes, err := io.ReadAll(limited)
+		if err != nil {
+			http.Error(w, "Failed to read playlist", http.StatusBadGateway)
+			return
+		}
+
+		base := parsedTarget
+		proxyBasePath := fmt.Sprintf("/api/channels/%d/preview", channelID)
+
+		scanner := bufio.NewScanner(bytes.NewReader(bodyBytes))
+		// Allow reasonably long URIs
+		scanner.Buffer(make([]byte, 0, 64*1024), 512*1024)
+
+		var out strings.Builder
+		for scanner.Scan() {
+			line := scanner.Text()
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+				out.WriteString(line)
+				out.WriteString("\n")
+				continue
+			}
+
+			ref, err := url.Parse(trimmed)
+			if err != nil {
+				out.WriteString(line)
+				out.WriteString("\n")
+				continue
+			}
+
+			abs := base.ResolveReference(ref).String()
+			out.WriteString(proxyBasePath)
+			out.WriteString("?url=")
+			out.WriteString(url.QueryEscape(abs))
+			out.WriteString("\n")
+		}
+		if err := scanner.Err(); err != nil {
+			http.Error(w, "Failed to parse playlist", http.StatusBadGateway)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.WriteHeader(resp.StatusCode)
+		io.WriteString(w, out.String())
+		return
+	}
 
 	// Copy response headers
 	for k, v := range resp.Header {
