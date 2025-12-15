@@ -23,13 +23,13 @@ VITE_OUT_DIR=dist-pro
 VITE_APP_TITLE=mqltv
 
 # 是否包分析
-VITE_USE_BUNDLE_ANALYZER=true
+VITE_USE_BUNDLE_ANALYZER=false
 
 # 是否全量引入element-plus样式
 VITE_USE_ALL_ELEMENT_PLUS_STYLE=false
 
 # 是否开启mock
-VITE_USE_MOCK=true
+VITE_USE_MOCK=false
 
 # 是否切割css
 VITE_USE_CSS_SPLIT=true
