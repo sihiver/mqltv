@@ -442,11 +442,13 @@ func ExtendSubscription(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":        true,
-		"message":        "Subscription extended successfully",
-		"expires_at":     newExpiresAt,
-		"days_extended":  req.Days,
-		"days_remaining": daysRemaining,
+		"code":    0,
+		"message": "Subscription extended successfully",
+		"data": map[string]interface{}{
+			"expires_at":     newExpiresAt,
+			"days_extended":  req.Days,
+			"days_remaining": daysRemaining,
+		},
 	})
 }
 

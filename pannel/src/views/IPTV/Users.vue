@@ -210,6 +210,13 @@ onMounted(() => {
         </template>
       </ElTableColumn>
 
+      <ElTableColumn label="Days Remaining" width="140">
+        <template #default="{ row }">
+          <span v-if="row?.is_expired">Expired</span>
+          <span v-else>{{ row?.days_remaining ?? '-' }}</span>
+        </template>
+      </ElTableColumn>
+
       <ElTableColumn prop="created_at" label="Created" width="180">
         <template #default="{ row }">
           {{ new Date(row.created_at).toLocaleString() }}
