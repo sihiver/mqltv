@@ -98,3 +98,50 @@ async function importPlaylist() {
         statusDiv.innerHTML = `<div class="alert alert-error">❌ Error: ${error.message}</div>`;
     }
 }
+
+function showCreatePlaylist() {
+    document.getElementById('createPlaylistForm').style.display = 'block';
+}
+
+function hideCreatePlaylist() {
+    document.getElementById('createPlaylistForm').style.display = 'none';
+    document.getElementById('manualPlaylistName').value = '';
+    document.getElementById('manualPlaylistType').value = 'manual';
+    document.getElementById('createPlaylistStatus').innerHTML = '';
+}
+
+async function createManualPlaylist() {
+    const name = document.getElementById('manualPlaylistName').value.trim();
+    const type = document.getElementById('manualPlaylistType').value;
+    
+    if (!name) {
+        alert('Nama playlist harus diisi!');
+        return;
+    }
+    
+    const statusDiv = document.getElementById('createPlaylistStatus');
+    statusDiv.innerHTML = '<div class="alert">⏳ Membuat playlist...</div>';
+    
+    try {
+        const response = await fetch('/api/playlists', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, type })
+        });
+        
+        const result = await response.json();
+        
+        if (result.code === 0) {
+            statusDiv.innerHTML = `<div class="alert alert-success">✅ ${result.message}</div>`;
+            setTimeout(() => {
+                hideCreatePlaylist();
+                loadPlaylists();
+                loadStats();
+            }, 1500);
+        } else {
+            statusDiv.innerHTML = `<div class="alert alert-error">❌ ${result.message}</div>`;
+        }
+    } catch (error) {
+        statusDiv.innerHTML = `<div class="alert alert-error">❌ Error: ${error.message}</div>`;
+    }
+}

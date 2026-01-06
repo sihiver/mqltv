@@ -115,6 +115,62 @@ func ImportPlaylist(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// CreatePlaylist creates a new manual playlist (without M3U import)
+func CreatePlaylist(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name string `json:"name"`
+		Type string `json:"type"` // "manual", "m3u", or "relay"
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Name == "" {
+		http.Error(w, "Playlist name is required", http.StatusBadRequest)
+		return
+	}
+
+	// Default type to "manual" if not specified
+	if req.Type == "" {
+		req.Type = "manual"
+	}
+
+	// Validate type
+	if req.Type != "manual" && req.Type != "m3u" && req.Type != "relay" {
+		http.Error(w, "Invalid playlist type. Must be 'manual', 'm3u', or 'relay'", http.StatusBadRequest)
+		return
+	}
+
+	// Insert playlist
+	result, err := database.DB.Exec(
+		"INSERT INTO playlists (name, url, type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+		req.Name, "", req.Type, time.Now(), time.Now())
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"data":    nil,
+			"message": "Failed to create playlist: " + err.Error(),
+		})
+		return
+	}
+
+	playlistID, _ := result.LastInsertId()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code": 0,
+		"data": map[string]interface{}{
+			"id":   playlistID,
+			"name": req.Name,
+			"type": req.Type,
+		},
+		"message": "Playlist created successfully",
+	})
+}
+
 // GetChannels returns channels for a playlist
 func GetChannels(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)

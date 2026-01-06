@@ -74,6 +74,28 @@
         <!-- Playlists Tab -->
         <div id="playlists" class="tab-content active">
             <h2>Daftar Playlists</h2>
+            <button class="btn btn-primary" onclick="showCreatePlaylist()">➕ Buat Playlist Manual</button>
+            <button class="btn" onclick="switchTab('import', event)">📥 Import dari M3U</button>
+            
+            <div id="createPlaylistForm" style="display: none; margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                <h3>Buat Playlist Manual</h3>
+                <div class="form-group">
+                    <label>Nama Playlist *</label>
+                    <input type="text" id="manualPlaylistName" placeholder="Contoh: Playlist Favorit">
+                </div>
+                <div class="form-group">
+                    <label>Tipe Playlist</label>
+                    <select id="manualPlaylistType">
+                        <option value="manual">Manual</option>
+                        <option value="m3u">M3U</option>
+                        <option value="relay">Relay</option>
+                    </select>
+                </div>
+                <button class="btn btn-primary" onclick="createManualPlaylist()">Buat Playlist</button>
+                <button class="btn" onclick="hideCreatePlaylist()">Batal</button>
+                <div id="createPlaylistStatus"></div>
+            </div>
+            
             <div id="playlistsList"></div>
         </div>
 

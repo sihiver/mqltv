@@ -10,7 +10,10 @@ import {
   ElDialog,
   ElForm,
   ElFormItem,
-  ElInput
+  ElInput,
+  ElSelect,
+  ElOption,
+  ElTag
 } from 'element-plus'
 import { ref, onMounted } from 'vue'
 import request from '@/axios'
@@ -18,10 +21,15 @@ import request from '@/axios'
 const playlists = ref([])
 const loading = ref(false)
 const editDialogVisible = ref(false)
+const addDialogVisible = ref(false)
 const editForm = ref({
   id: 0,
   name: '',
   url: ''
+})
+const addForm = ref({
+  name: '',
+  type: 'manual'
 })
 
 const loadPlaylists = async () => {
@@ -36,6 +44,36 @@ const loadPlaylists = async () => {
     ElMessage.error('Failed to load playlists')
   } finally {
     loading.value = false
+  }
+}
+
+const openAddDialog = () => {
+  addForm.value = {
+    name: '',
+    type: 'manual'
+  }
+  addDialogVisible.value = true
+}
+
+const createPlaylist = async () => {
+  if (!addForm.value.name.trim()) {
+    ElMessage.warning('Please enter playlist name')
+    return
+  }
+
+  try {
+    await request.post({
+      url: '/api/playlists',
+      data: {
+        name: addForm.value.name,
+        type: addForm.value.type
+      }
+    })
+    ElMessage.success('Playlist created successfully')
+    addDialogVisible.value = false
+    loadPlaylists()
+  } catch (error) {
+    ElMessage.error('Failed to create playlist')
   }
 }
 
@@ -133,6 +171,13 @@ onMounted(() => {
 
 <template>
   <ContentWrap title="Playlists" message="Manage your M3U playlists">
+    <div style="margin-bottom: 16px">
+      <ElButton type="primary" @click="openAddDialog">
+        <Icon icon="ep:plus" style="margin-right: 4px" />
+        Add Playlist
+      </ElButton>
+    </div>
+
     <ElTable :data="playlists" v-loading="loading" style="width: 100%">
       <ElTableColumn prop="name" label="Playlist Name" min-width="200">
         <template #default="{ row }">
@@ -176,6 +221,30 @@ onMounted(() => {
         </template>
       </ElTableColumn>
     </ElTable>
+
+    <!-- Add Playlist Dialog -->
+    <ElDialog v-model="addDialogVisible" title="Add New Playlist" width="500px">
+      <ElForm :model="addForm" label-width="100px">
+        <ElFormItem label="Name" required>
+          <ElInput
+            v-model="addForm.name"
+            placeholder="Enter playlist name"
+            @keyup.enter="createPlaylist"
+          />
+        </ElFormItem>
+        <ElFormItem label="Type">
+          <el-select v-model="addForm.type" placeholder="Select type" style="width: 100%">
+            <el-option label="Manual" value="manual" />
+            <el-option label="M3U" value="m3u" />
+            <el-option label="Relay" value="relay" />
+          </el-select>
+        </ElFormItem>
+      </ElForm>
+      <template #footer>
+        <ElButton @click="addDialogVisible = false">Cancel</ElButton>
+        <ElButton type="primary" @click="createPlaylist">Create</ElButton>
+      </template>
+    </ElDialog>
 
     <!-- Edit Dialog -->
     <ElDialog v-model="editDialogVisible" title="Edit Playlist" width="500px">

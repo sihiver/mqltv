@@ -88,6 +88,7 @@ func main() {
 
 	// Playlists
 	api.HandleFunc("/playlists", handlers.GetPlaylists).Methods("GET")
+	api.HandleFunc("/playlists", handlers.CreatePlaylist).Methods("POST")
 	api.HandleFunc("/playlists/import", handlers.ImportPlaylist).Methods("POST")
 	api.HandleFunc("/playlists/{id}", handlers.UpdatePlaylist).Methods("PUT")
 	api.HandleFunc("/playlists/{id}", handlers.DeletePlaylist).Methods("DELETE")
