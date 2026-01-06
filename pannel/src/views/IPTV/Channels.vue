@@ -2,8 +2,6 @@
 import { ContentWrap } from '@/components/ContentWrap'
 import { Icon } from '@iconify/vue'
 import {
-  ElRow,
-  ElCol,
   ElTable,
   ElTableColumn,
   ElButton,
@@ -28,6 +26,7 @@ const categories = ref<string[]>([])
 const playlists = ref<any[]>([])
 const searchQuery = ref('')
 const selectedCategory = ref('')
+const selectedPlaylist = ref<number | undefined>(undefined)
 const selectedChannels = ref<Set<number>>(new Set())
 const loading = ref(false)
 const currentPage = ref(1)
@@ -79,6 +78,10 @@ const allFilteredChannels = computed(() => {
     result = result.filter((ch: any) => ch.category === selectedCategory.value)
   }
 
+  if (selectedPlaylist.value !== undefined) {
+    result = result.filter((ch: any) => ch.playlist_id === selectedPlaylist.value)
+  }
+
   return result
 })
 
@@ -120,7 +123,7 @@ const syncTableSelection = () => {
 }
 
 // Reset to page 1 when search or filter changes
-watch([searchQuery, selectedCategory], () => {
+watch([searchQuery, selectedCategory, selectedPlaylist], () => {
   currentPage.value = 1
 })
 
@@ -558,52 +561,65 @@ onUnmounted(() => {
 <template>
   <ContentWrap title="Channels" message="Manage IPTV channels">
     <!-- Toolbar -->
-    <ElRow :gutter="12" style="margin-bottom: 16px">
-      <ElCol :xs="24" :sm="12" :md="8">
-        <ElInput v-model="searchQuery" placeholder="Search channels..." clearable>
-          <template #prefix>
-            <Icon icon="ep:search" />
-          </template>
-        </ElInput>
-      </ElCol>
+    <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center">
+      <ElInput
+        v-model="searchQuery"
+        placeholder="Search channels..."
+        clearable
+        style="width: 220px"
+      >
+        <template #prefix>
+          <Icon icon="ep:search" />
+        </template>
+      </ElInput>
 
-      <ElCol :xs="24" :sm="12" :md="8">
-        <ElSelect
-          v-model="selectedCategory"
-          placeholder="All Categories"
-          clearable
-          style="width: 100%"
+      <ElSelect
+        v-model="selectedPlaylist"
+        placeholder="All Playlists"
+        clearable
+        style="width: 200px"
+      >
+        <ElOption
+          v-for="playlist in playlists"
+          :key="playlist.id"
+          :label="playlist.name"
+          :value="playlist.id"
+        />
+      </ElSelect>
+
+      <ElSelect
+        v-model="selectedCategory"
+        placeholder="All Categories"
+        clearable
+        style="width: 200px"
+      >
+        <ElOption
+          v-for="category in categories"
+          :key="category"
+          :label="category"
+          :value="category"
+        />
+      </ElSelect>
+
+      <div style="margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap">
+        <ElButton type="primary" @click="handleCreate">
+          <Icon icon="ep:plus" />
+          Add Channel
+        </ElButton>
+        <ElButton :disabled="!selectedCategory" @click="openRenameCategory">
+          <Icon icon="ep:edit" />
+          Rename Category
+        </ElButton>
+        <ElButton
+          type="danger"
+          :disabled="selectedChannels.size === 0"
+          @click="handleBatchDelete"
         >
-          <ElOption
-            v-for="category in categories"
-            :key="category"
-            :label="category"
-            :value="category"
-          />
-        </ElSelect>
-      </ElCol>
-
-      <ElCol :xs="24" :sm="24" :md="8">
-        <div style="display: flex; gap: 8px; flex-wrap: wrap">
-          <ElButton type="primary" @click="handleCreate">
-            <Icon icon="ep:plus" />
-            Add Channel
-          </ElButton>
-          <ElButton :disabled="!selectedCategory" @click="openRenameCategory">
-            <Icon icon="ep:edit" />
-            Rename Category
-          </ElButton>
-          <ElButton
-            type="danger"
-            :disabled="selectedChannels.size === 0"
-            @click="handleBatchDelete"
-          >
-            <Icon icon="ep:delete" />
-            Delete ({{ selectedChannels.size }})
-          </ElButton>
-        </div>
-      </ElCol>
-    </ElRow>
+          <Icon icon="ep:delete" />
+          Delete ({{ selectedChannels.size }})
+        </ElButton>
+      </div>
+    </div>
 
     <!-- Channels Table -->
     <ElTable
