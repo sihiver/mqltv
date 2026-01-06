@@ -117,6 +117,7 @@ func main() {
 	// Users
 	api.HandleFunc("/users", handlers.GetUsers).Methods("GET")
 	api.HandleFunc("/users", handlers.CreateUser).Methods("POST")
+	api.HandleFunc("/users/check/{username}", handlers.CheckUser).Methods("GET")
 	api.HandleFunc("/users/{id}", handlers.GetUserDetail).Methods("GET")
 	api.HandleFunc("/users/{id}", handlers.UpdateUser).Methods("PUT")
 	api.HandleFunc("/users/{id}", handlers.DeleteUser).Methods("DELETE")

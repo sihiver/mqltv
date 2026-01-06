@@ -807,3 +807,95 @@ func GenerateUserPlaylist(w http.ResponseWriter, r *http.Request) {
 		"message": fmt.Sprintf("Playlist generated successfully with %d channels", channelCount),
 	})
 }
+
+// CheckUser checks if user exists and validates credentials
+func CheckUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	username := vars["username"]
+
+	// Get password from query parameter (optional for credential check)
+	password := r.URL.Query().Get("password")
+
+	var user models.User
+	var passwordHash string
+	err := database.DB.QueryRow(`
+		SELECT id, username, password, full_name, email, max_connections, is_active, 
+		       created_at, activated_at, expires_at, last_login, notes
+		FROM users WHERE username = ?
+	`, username).Scan(&user.ID, &user.Username, &passwordHash, &user.FullName, 
+		&user.Email, &user.MaxConnections, &user.IsActive, &user.CreatedAt,
+		&user.ActivatedAt, &user.ExpiresAt, &user.LastLogin, &user.Notes)
+
+	if err == sql.ErrNoRows {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"data":    nil,
+			"message": "User not found",
+		})
+		return
+	}
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Calculate days remaining and expired status
+	if user.ExpiresAt != nil {
+		remaining := time.Until(*user.ExpiresAt)
+		user.DaysRemaining = int(remaining.Hours() / 24)
+		user.IsExpired = remaining < 0
+	}
+
+	// If password provided, validate it
+	validCredentials := true
+	if password != "" {
+		expectedHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
+		validCredentials = (passwordHash == expectedHash)
+	}
+
+	// Get active connections count
+	var activeConnections int
+	database.DB.QueryRow(`
+		SELECT COUNT(*) FROM user_connections 
+		WHERE user_id = ? AND disconnected_at IS NULL
+	`, user.ID).Scan(&activeConnections)
+
+	response := map[string]interface{}{
+		"id":                 user.ID,
+		"username":           user.Username,
+		"full_name":          user.FullName,
+		"email":              user.Email,
+		"max_connections":    user.MaxConnections,
+		"active_connections": activeConnections,
+		"is_active":          user.IsActive,
+		"is_expired":         user.IsExpired,
+		"days_remaining":     user.DaysRemaining,
+		"created_at":         user.CreatedAt,
+		"activated_at":       user.ActivatedAt,
+		"expires_at":         user.ExpiresAt,
+		"last_login":         user.LastLogin,
+		"notes":              user.Notes,
+	}
+
+	if password != "" {
+		response["valid_credentials"] = validCredentials
+		if !validCredentials {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"code":    1,
+				"data":    response,
+				"message": "Invalid credentials",
+			})
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    0,
+		"data":    response,
+		"message": "User found",
+	})
+}
