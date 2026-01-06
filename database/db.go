@@ -42,6 +42,7 @@ func createTables() error {
 			logo TEXT,
 			group_name TEXT,
 			active INTEGER DEFAULT 1,
+			on_demand INTEGER DEFAULT 1,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE
 		)`,
@@ -119,6 +120,9 @@ func createTables() error {
 	// Create default settings
 	createDefaultSettings()
 
+	// Run migrations
+	runMigrations()
+
 	log.Println("Database tables created successfully")
 	return nil
 }
@@ -174,6 +178,23 @@ func createDefaultSettings() {
 			if count == 0 {
 				DB.Exec("INSERT INTO settings (key, value, category) VALUES (?, ?, ?)", key, value, category)
 			}
+		}
+	}
+}
+
+func runMigrations() {
+	// Migration: Add on_demand column to channels table if not exists
+	var columnExists int
+	err := DB.QueryRow(`
+		SELECT COUNT(*) FROM pragma_table_info('channels') WHERE name='on_demand'
+	`).Scan(&columnExists)
+	
+	if err == nil && columnExists == 0 {
+		_, err = DB.Exec("ALTER TABLE channels ADD COLUMN on_demand INTEGER DEFAULT 1")
+		if err == nil {
+			log.Println("✅ Migration: Added on_demand column to channels table")
+		} else {
+			log.Printf("⚠️  Migration failed: %v", err)
 		}
 	}
 }

@@ -14,7 +14,8 @@ import {
   ElPagination,
   ElDialog,
   ElForm,
-  ElFormItem
+  ElFormItem,
+  ElSwitch
 } from 'element-plus'
 import { ref, computed, onMounted, onUnmounted, watchEffect, watch, nextTick } from 'vue'
 import request from '@/axios'
@@ -44,7 +45,8 @@ const formData = ref({
   name: '',
   url: '',
   logo: '',
-  group_name: ''
+  group_name: '',
+  on_demand: true
 })
 
 // Rename category dialog state
@@ -227,7 +229,8 @@ const handleCreate = () => {
     name: '',
     url: '',
     logo: '',
-    group_name: ''
+    group_name: '',
+    on_demand: true
   }
   dialogVisible.value = true
 }
@@ -241,7 +244,8 @@ const handleEdit = (row: any) => {
     name: row.name,
     url: row.url,
     logo: row.logo,
-    group_name: row.category || ''
+    group_name: row.category || '',
+    on_demand: row.on_demand !== undefined ? row.on_demand : true
   }
   dialogVisible.value = true
 }
@@ -369,7 +373,8 @@ const handleSave = async () => {
           name: formData.value.name,
           url: formData.value.url,
           logo: formData.value.logo,
-          group_name: formData.value.group_name
+          group_name: formData.value.group_name,
+          on_demand: formData.value.on_demand
         }
       })
 
@@ -389,7 +394,8 @@ const handleSave = async () => {
           name: formData.value.name,
           url: formData.value.url,
           logo: formData.value.logo,
-          group_name: formData.value.group_name
+          group_name: formData.value.group_name,
+          on_demand: formData.value.on_demand
         }
       })
 
@@ -561,7 +567,9 @@ onUnmounted(() => {
 <template>
   <ContentWrap title="Channels" message="Manage IPTV channels">
     <!-- Toolbar -->
-    <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center">
+    <div
+      style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center"
+    >
       <ElInput
         v-model="searchQuery"
         placeholder="Search channels..."
@@ -610,11 +618,7 @@ onUnmounted(() => {
           <Icon icon="ep:edit" />
           Rename Category
         </ElButton>
-        <ElButton
-          type="danger"
-          :disabled="selectedChannels.size === 0"
-          @click="handleBatchDelete"
-        >
+        <ElButton type="danger" :disabled="selectedChannels.size === 0" @click="handleBatchDelete">
           <Icon icon="ep:delete" />
           Delete ({{ selectedChannels.size }})
         </ElButton>
@@ -731,6 +735,13 @@ onUnmounted(() => {
 
         <ElFormItem label="Category">
           <ElInput v-model="formData.group_name" placeholder="e.g., Sports, News, Entertainment" />
+        </ElFormItem>
+
+        <ElFormItem label="On-Demand">
+          <ElSwitch v-model="formData.on_demand" active-text="Enabled" inactive-text="Disabled" />
+          <div style="font-size: 12px; color: #909399; margin-top: 4px">
+            When disabled, stream stays on continuously (no auto-stop when idle)
+          </div>
         </ElFormItem>
       </ElForm>
 

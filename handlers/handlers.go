@@ -795,7 +795,7 @@ func SearchChannels(w http.ResponseWriter, r *http.Request) {
 	if query == "" {
 		// If no query, return all active channels with playlist info
 		rows, err = database.DB.Query(`
-			SELECT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at, p.name as playlist_name
+			SELECT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.on_demand, c.created_at, p.name as playlist_name
 			FROM channels c
 			LEFT JOIN playlists p ON c.playlist_id = p.id
 			WHERE c.active = 1 
@@ -805,7 +805,7 @@ func SearchChannels(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// If query provided, search by name
 		rows, err = database.DB.Query(`
-			SELECT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at, p.name as playlist_name
+			SELECT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.on_demand, c.created_at, p.name as playlist_name
 			FROM channels c
 			LEFT JOIN playlists p ON c.playlist_id = p.id
 			WHERE c.name LIKE ? AND c.active = 1 
@@ -824,7 +824,7 @@ func SearchChannels(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var c models.Channel
 		var playlistName sql.NullString
-		if err := rows.Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, &c.Active, &c.CreatedAt, &playlistName); err != nil {
+		if err := rows.Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, &c.Active, &c.OnDemand, &c.CreatedAt, &playlistName); err != nil {
 			continue
 		}
 
@@ -838,6 +838,7 @@ func SearchChannels(w http.ResponseWriter, r *http.Request) {
 			"group_name":    c.Group,
 			"enabled":       c.Active,
 			"active":        c.Active,
+			"on_demand":     c.OnDemand,
 			"created_at":    c.CreatedAt,
 			"playlist_name": "",
 		}
@@ -864,6 +865,7 @@ func CreateChannel(w http.ResponseWriter, r *http.Request) {
 		URL        string `json:"url"`
 		Logo       string `json:"logo"`
 		GroupName  string `json:"group_name"`
+		OnDemand   *bool  `json:"on_demand"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -884,9 +886,15 @@ func CreateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Default on_demand to true if not specified
+	onDemand := 1
+	if req.OnDemand != nil && !*req.OnDemand {
+		onDemand = 0
+	}
+
 	result, err := database.DB.Exec(
-		"INSERT INTO channels (playlist_id, name, url, logo, group_name, active) VALUES (?, ?, ?, ?, ?, 1)",
-		req.PlaylistID, req.Name, req.URL, req.Logo, req.GroupName,
+		"INSERT INTO channels (playlist_id, name, url, logo, group_name, active, on_demand) VALUES (?, ?, ?, ?, ?, 1, ?)",
+		req.PlaylistID, req.Name, req.URL, req.Logo, req.GroupName, onDemand,
 	)
 
 	if err != nil {
@@ -904,11 +912,11 @@ func CreateChannel(w http.ResponseWriter, r *http.Request) {
 	var c models.Channel
 	var playlistName sql.NullString
 	err = database.DB.QueryRow(`
-		SELECT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at, p.name as playlist_name
+		SELECT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.on_demand, c.created_at, p.name as playlist_name
 		FROM channels c
 		LEFT JOIN playlists p ON c.playlist_id = p.id
 		WHERE c.id = ?
-	`, channelID).Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, &c.Active, &c.CreatedAt, &playlistName)
+	`, channelID).Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, &c.Active, &c.OnDemand, &c.CreatedAt, &playlistName)
 
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -929,6 +937,7 @@ func CreateChannel(w http.ResponseWriter, r *http.Request) {
 		"group_name":    c.Group,
 		"enabled":       c.Active,
 		"active":        c.Active,
+		"on_demand":     c.OnDemand,
 		"created_at":    c.CreatedAt,
 		"playlist_name": "",
 	}
@@ -955,6 +964,7 @@ func UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		URL       string `json:"url"`
 		Logo      string `json:"logo"`
 		GroupName string `json:"group_name"`
+		OnDemand  *bool  `json:"on_demand"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -975,29 +985,48 @@ func UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := database.DB.Exec(
-		"UPDATE channels SET name = ?, url = ?, logo = ?, group_name = ? WHERE id = ?",
-		req.Name, req.URL, req.Logo, req.GroupName, channelID,
-	)
-
-	if err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"code":    1,
-			"message": "Failed to update channel: " + err.Error(),
-		})
-		return
+	// Build update query
+	if req.OnDemand != nil {
+		onDemand := 0
+		if *req.OnDemand {
+			onDemand = 1
+		}
+		_, err := database.DB.Exec(
+			"UPDATE channels SET name = ?, url = ?, logo = ?, group_name = ?, on_demand = ? WHERE id = ?",
+			req.Name, req.URL, req.Logo, req.GroupName, onDemand, channelID,
+		)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"code":    1,
+				"message": "Failed to update channel: " + err.Error(),
+			})
+			return
+		}
+	} else {
+		_, err := database.DB.Exec(
+			"UPDATE channels SET name = ?, url = ?, logo = ?, group_name = ? WHERE id = ?",
+			req.Name, req.URL, req.Logo, req.GroupName, channelID,
+		)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"code":    1,
+				"message": "Failed to update channel: " + err.Error(),
+			})
+			return
+		}
 	}
 
 	// Get the updated channel with playlist info
 	var c models.Channel
 	var playlistName sql.NullString
-	err = database.DB.QueryRow(`
-		SELECT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.created_at, p.name as playlist_name
+	err := database.DB.QueryRow(`
+		SELECT c.id, c.playlist_id, c.name, c.url, c.logo, c.group_name, c.active, c.on_demand, c.created_at, p.name as playlist_name
 		FROM channels c
 		LEFT JOIN playlists p ON c.playlist_id = p.id
 		WHERE c.id = ?
-	`, channelID).Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, &c.Active, &c.CreatedAt, &playlistName)
+	`, channelID).Scan(&c.ID, &c.PlaylistID, &c.Name, &c.URL, &c.Logo, &c.Group, &c.Active, &c.OnDemand, &c.CreatedAt, &playlistName)
 
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -1018,6 +1047,7 @@ func UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		"group_name":    c.Group,
 		"enabled":       c.Active,
 		"active":        c.Active,
+		"on_demand":     c.OnDemand,
 		"created_at":    c.CreatedAt,
 		"playlist_name": "",
 	}

@@ -22,6 +22,7 @@ type Channel struct {
 	Logo       string    `json:"logo"`
 	Group      string    `json:"group"`
 	Active     bool      `json:"active"`
+	OnDemand   bool      `json:"on_demand"`
 	CreatedAt  time.Time `json:"created_at"`
 }
 
