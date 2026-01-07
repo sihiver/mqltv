@@ -210,7 +210,16 @@ ExecStart=/home/dindin/mqltv/iptv-panel
 Restart=always
 Environment="PORT=8080"
 Environment="DB_PATH=/home/dindin/mqltv/iptv.db"
-Environment="HOST=YOUR_VPS_IP:8080"
+# OPTIONAL (biasanya tidak perlu):
+# - Jika tidak diset, sistem akan otomatis pakai Host dari request (r.Host).
+#   Catatan: kalau kamu akses panel/API dari `localhost`, maka URL playlist yang di-generate
+#   memang akan jadi `http://localhost:PORT/...`.
+# - Jika pakai reverse proxy (Nginx/Caddy/Cloudflare), pastikan header
+#   X-Forwarded-Host dan X-Forwarded-Proto diteruskan.
+# - Jika ingin dipaksa selalu absolut ke domain tertentu, pakai PUBLIC_BASE_URL.
+#
+# Environment="PUBLIC_BASE_URL=https://iptv.yourdomain.com"
+# Environment="HOST=YOUR_VPS_IP:8080"
 # Ganti YOUR_VPS_IP dengan IP publik VPS (contoh: 203.0.113.10:8080)
 # Atau gunakan domain: Environment="HOST=iptv.yourdomain.com"
 

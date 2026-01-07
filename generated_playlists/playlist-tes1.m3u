@@ -1,0 +1,45 @@
+#EXTM3U
+#EXTINF:-1 tvg-id="115" tvg-name="ANTV" tvg-logo="https://thumbor.prod.vidiocdn.com/45W5WeEJJyd4q_kNCsZBsDZvf1Q=/filters:strip_icc():quality(70)/vidio-web-prod-user/uploads/user/avatar/88855596/PROFILETVONE-ad494997ef15cf6d.jpg" group-title="LOKAL INDONESIA™",ANTV
+http://192.168.0.2:8080/stream/channel-115?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="121" tvg-name="Bali TV" tvg-logo="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQCi6fPl9htPxqaE1f2B9hZK9TXm6LrYPEEgA&s" group-title="LOKAL INDONESIA™",Bali TV
+http://192.168.0.2:8080/stream/channel-121?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="105" tvg-name="GTV" tvg-logo="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT-EehM8fz1VW8hKyeTEjD1aPc9Fu3RpH67Eg&s" group-title="LOKAL INDONESIA™",GTV
+http://192.168.0.2:8080/stream/channel-105?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="300" tvg-name="Indosiar" tvg-logo="http://goldenid.online:80/images/MuJ8fbAi_MkdxEgTx4Ih-1gLaqcgSkbejhA1LVB8e8ukTkzUhrsjswTPB9d3zJRiGhNQG7YekYBbrFJ5ec_pvw.png" group-title="LOKAL INDONESIA™",Indosiar
+http://192.168.0.2:8080/stream/channel-300?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="109" tvg-name="Indosiar (Sport)" tvg-logo="http://goldenid.online:80/images/MuJ8fbAi_MkdxEgTx4Ih-1gLaqcgSkbejhA1LVB8e8ukTkzUhrsjswTPB9d3zJRiGhNQG7YekYBbrFJ5ec_pvw.png" group-title="LOKAL INDONESIA™",Indosiar (Sport)
+http://192.168.0.2:8080/stream/channel-109?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="113" tvg-name="Kompas tv" tvg-logo="http://goldenid.online:80/images/KAts4CTlAHmisT2eFggVHj-jUikG-UwFiElWbJow-nhdIXVGCRET5gc68B_8WaQbmHjYXuyuSZzAYWIskIQTYMeZyXzJB_M4E3Ah6Pk3O14xqfOgB33cp24-NITHtsI5ncMPZ3Et7TdHj584PjEsyK5j6UHWNiut4zPiDNL1cvp9FIXvUkE205Kke87TwTiz.jpg" group-title="LOKAL INDONESIA™",Kompas tv
+http://192.168.0.2:8080/stream/channel-113?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="117" tvg-name="METRO TV HD" tvg-logo="http://goldenid.online:80/images/c2UotlQ1L6lyEyZz5xHNY9N4yEE04AslBSyS7Fj4VciykD7Oukt0W6Zfteug1LMFOVWE3AOau13ai65W_yxoQrvbjQdbtT33JX4Mo_1V1uw.png" group-title="LOKAL INDONESIA™",METRO TV HD
+http://192.168.0.2:8080/stream/channel-117?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="104" tvg-name="MNC TV" tvg-logo="http://goldenid.online:80/images/0eXynFBMWQjHfkx0379MZrDGEj5M1DQg4k-aOToZA1mHUHatl8sqWaKFe5pqBBJjv1oCunU9nfqtR48h2wYzXg.png" group-title="LOKAL INDONESIA™",MNC TV
+http://192.168.0.2:8080/stream/channel-104?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="119" tvg-name="Moji TV" tvg-logo="http://goldenid.online:80/images/uuhCT73pRsf8MG14YjRAJiS7qQ9qrlYY3BOIGsO6vAFgh7lv9oRZDd8xNaLIcamHrcToQ7zlTLoefWtWn3KN6okO5JlVGuoS6nLOMsl5DR7SxFin0S73UcFmQHmVj9D_JGM7TXbPd7mv-DXzKxeiEw.jpeg" group-title="LOKAL INDONESIA™",Moji TV
+http://192.168.0.2:8080/stream/channel-119?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="112" tvg-name="NET TV" tvg-logo="http://goldenid.online:80/images/Kanmk96vTt-hjZj_mC4RcPttLMlmeeoOsTOSXqs4fWXm360tfVL4n72DiGcqnmJjEM-uvp07OHeL3f6wXGCrsaBjtlugCyAnhpJFl-flPoEFBAf_55XripIuHrdNHt7-1OELNso9QtxVLwUTQhOZaCA3H2fGYstYqaQ8slVfgaQ.png" group-title="LOKAL INDONESIA™",NET TV
+http://192.168.0.2:8080/stream/channel-112?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="219" tvg-name="RCTI" tvg-logo="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh2hH6cKLWO2FqXKf93hERFqgM6s9xbTZgwUsCK9kb0ktZT6zrqqZvA1l32L4QKi_7G2Cfj5HPJ9B4iFsJukRaks4goecHUdfDCAODAORVxfAnsDXD5FKCfoDB1bZs5G-dxN9Uw8ZcE9cQ/s600/RCTI.png" group-title="LOKAL INDONESIA™",RCTI
+http://192.168.0.2:8080/stream/channel-219?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="103" tvg-name="RCTI (Sport)" tvg-logo="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEh2hH6cKLWO2FqXKf93hERFqgM6s9xbTZgwUsCK9kb0ktZT6zrqqZvA1l32L4QKi_7G2Cfj5HPJ9B4iFsJukRaks4goecHUdfDCAODAORVxfAnsDXD5FKCfoDB1bZs5G-dxN9Uw8ZcE9cQ/s600/RCTI.png" group-title="LOKAL INDONESIA™",RCTI (Sport)
+http://192.168.0.2:8080/stream/channel-103?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="118" tvg-name="RTV FHD" tvg-logo="http://goldenid.online:80/images/wtFA9pMcOn8VXZ_8fSjA4qfEGmMxxkWMhXnfInRK1v9NDBIiYpJv4XBjX31vy8FdeAREcyYmpTOcyXvd4Mye_qoFt_Lb45DFUSZMJJQ5xHM.jpg" group-title="LOKAL INDONESIA™",RTV FHD
+http://192.168.0.2:8080/stream/channel-118?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="111" tvg-name="SCTV" tvg-logo="https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcQhRgMGuo5tkNsUW9BDLl6keD_aCwytJSKnjBINOsqFnFCFFNmW" group-title="LOKAL INDONESIA™",SCTV
+http://192.168.0.2:8080/stream/channel-111?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="110" tvg-name="SCTV (Sport)" tvg-logo="http://goldenid.online:80/images/tcjBMuCD8M_zcpZuORRWzQaYp7zEO9FwxtiAOPLVkkeHoXsM3OMv1Soyy_zVhetNQGGOwDN5f7plivdrmFqc8D4VtawLxuvdtiEPImRdkT8tnmf6C4D4gywh1C5qH45ueKXi0iRoQVj8_x7qTM2YRA.jpeg" group-title="LOKAL INDONESIA™",SCTV (Sport)
+http://192.168.0.2:8080/stream/channel-110?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="116" tvg-name="TV ONE" tvg-logo="https://thumbor.prod.vidiocdn.com/kdj7v6XCX9C4UeOv6anzUgPtIB8=/filters:strip_icc():quality(70)/vidio-web-prod-user/uploads/user/avatar/88855732/PROFILETVONE-1-e4d30ebee473657b.png" group-title="LOKAL INDONESIA™",TV ONE
+http://192.168.0.2:8080/stream/channel-116?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="114" tvg-name="TVRI" tvg-logo="https://yt3.googleusercontent.com/ytc/AIdro_mhUyV8iNg5d_3sAtlPxTioVDSu2YBHr0CnFZdgqd6sJUk=s900-c-k-c0x00ffffff-no-rj" group-title="LOKAL INDONESIA™",TVRI
+http://192.168.0.2:8080/stream/channel-114?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="107" tvg-name="Trans 7" tvg-logo="https://www.dropbox.com/scl/fi/csmtr3nvtk4kovqboua10/logo-trans7.png?rlkey=obg6f7jeqa3po1qbm0gg6y59p&st=84hwezqm&dl=1" group-title="LOKAL INDONESIA™",Trans 7
+http://192.168.0.2:8080/stream/channel-107?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="199" tvg-name="Trans 7 Transmedia" tvg-logo="https://www.dropbox.com/scl/fi/csmtr3nvtk4kovqboua10/logo-trans7.png?rlkey=obg6f7jeqa3po1qbm0gg6y59p&st=84hwezqm&dl=1" group-title="LOKAL INDONESIA™",Trans 7 Transmedia
+http://192.168.0.2:8080/stream/channel-199?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="108" tvg-name="Trans TV" tvg-logo="https://scontent.fkno6-1.fna.fbcdn.net/v/t39.30808-6/491958870_1320388576121056_722558272581708029_n.jpg?_nc_cat=1&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeGclKuRG8UnOEmuuiLtvqxwz1ZtYuIbK5zPVm1i4hsrnJRVhXqPFt89YGXQm3Y7Dq6Brp71YqbY5UNr2YDELPJd&_nc_ohc=5ySPksr-r3YQ7kNvwHCKF8z&_nc_oc=AdmjASzvwbpDGaPXN1_mXxFtSI8bAIA2vdQRFr0sy7bTNKYdNef1ey2V6udMfsRSCVI&_nc_zt=23&_nc_ht=scontent.fkno6-1.fna&_nc_gid=0R-8SbmfJvPWJI9cm-FqMA&oh=00_AfJu0DfK8dXaa_zQxIGgLEDI5KBmm6hKCNvvFUc4-EA8JQ&oe=682894CA" group-title="LOKAL INDONESIA™",Trans TV
+http://192.168.0.2:8080/stream/channel-108?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="200" tvg-name="Trans TV Transmedia" tvg-logo="https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcQtIfkQ7F3PDmDIbeshisfZE83hMZO87drglKfEmPVwD9cqff0Y" group-title="LOKAL INDONESIA™",Trans TV Transmedia
+http://192.168.0.2:8080/stream/channel-200?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05
+#EXTINF:-1 tvg-id="106" tvg-name="i News" tvg-logo="https://media.licdn.com/dms/image/v2/C510BAQEDNZ0BcKErOg/company-logo_200_200/company-logo_200_200/0/1631419517461/sindotv_logo?e=2147483647&v=beta&t=2mx6P3l2c8MwSXgOi-eQ3KT788ZU_wxKN7CSvggF8QE" group-title="LOKAL INDONESIA™",i News
+http://192.168.0.2:8080/stream/channel-106?username=tes1&password=fa3fb6e0dccc657b57251c97db271b05

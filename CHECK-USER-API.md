@@ -12,6 +12,17 @@ API ini digunakan untuk memeriksa keberadaan user dan memvalidasi kredensial (op
 
 Memerlukan autentikasi admin (session cookie).
 
+### Dari mana `YOUR_SESSION_TOKEN`?
+
+`YOUR_SESSION_TOKEN` adalah nilai cookie session admin bernama **`admin-session`** yang dibuat otomatis setelah login admin berhasil.
+
+Cara mendapatkannya:
+
+1. Login admin via API: `POST /api/auth/login`
+2. Ambil cookie dari header response: `Set-Cookie: admin-session=...`
+
+Disarankan gunakan **cookie-jar** (`-c` dan `-b`) agar tidak perlu copy-paste token.
+
 ## Parameters
 
 ### Path Parameters
@@ -120,15 +131,22 @@ Jika parameter `password` diberikan, response akan menyertakan field tambahan:
 ### 1. Cek User Tanpa Validasi Password
 
 ```bash
+# 1) Login admin dan simpan cookie ke cookies.txt
+curl -i -c cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin123"}' \
+  "http://localhost:8080/api/auth/login"
+
+# 2) Panggil endpoint check-user dengan cookie yang tersimpan
 curl -X GET "http://localhost:8080/api/users/check/nizam" \
-  -H "Cookie: admin-session=YOUR_SESSION_TOKEN"
+  -b cookies.txt
 ```
 
 ### 2. Cek User Dengan Validasi Password
 
 ```bash
 curl -X GET "http://localhost:8080/api/users/check/nizam?password=123" \
-  -H "Cookie: admin-session=YOUR_SESSION_TOKEN"
+  -b cookies.txt
 ```
 
 ### 3. JavaScript/Fetch Example
@@ -175,3 +193,11 @@ fetch('http://localhost:8080/api/users/check/nizam?password=123', {
 - Active connections dihitung dari tabel `user_connections`
 - Days remaining dihitung dari `expires_at` minus waktu sekarang
 - User dianggap expired jika `expires_at < now()`
+
+### Untuk Aplikasi Penonton (Android)
+
+Endpoint ini memang untuk kebutuhan **admin** (karena butuh cookie `admin-session`).
+
+Jika kebutuhanmu adalah login penonton + cek expired sebelum masuk app, gunakan endpoint publik:
+
+- `POST /api/user/login` (lihat dokumentasi di `USER-LOGIN-API.md`)

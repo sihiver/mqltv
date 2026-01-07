@@ -59,6 +59,8 @@ func main() {
 	r.HandleFunc("/api/auth/login", handlers.Login).Methods("POST")
 	r.HandleFunc("/api/auth/logout", handlers.Logout).Methods("POST")
 	r.HandleFunc("/api/auth/check", handlers.CheckAuth).Methods("GET")
+	// User login (public) - for client apps (Android)
+	r.HandleFunc("/api/user/login", handlers.UserLogin).Methods("POST")
 	r.HandleFunc("/login.html", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./static/login.html")
 	}).Methods("GET")
