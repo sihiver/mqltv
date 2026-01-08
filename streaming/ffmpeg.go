@@ -15,6 +15,8 @@ type FFmpegSession struct {
 	ID            string
 	SourceURLs    []string
 	OutputFormat  string // "mpegts", "hls", "copy"
+	onDemand      bool
+	onDemandMux   sync.RWMutex
 	ctx           context.Context
 	cancel        context.CancelFunc
 	cmd           *exec.Cmd
@@ -93,6 +95,7 @@ func (m *FFmpegManager) GetOrCreateFFmpegSession(streamID string, sourceURLs []s
 		ID:           streamID,
 		SourceURLs:   sourceURLs,
 		OutputFormat: format,
+		onDemand:     true,
 		ctx:          ctx,
 		cancel:       cancel,
 		clients:      make(map[string]*StreamClient),
@@ -113,6 +116,22 @@ func (m *FFmpegManager) GetOrCreateFFmpegSession(streamID string, sourceURLs []s
 	log.Printf("🎬 Created FFmpeg session: %s (format: %s)", streamID, format)
 
 	return session
+}
+
+// SetOnDemand configures whether this session should auto-stop when idle.
+// onDemand=true  => auto-start/auto-stop (default)
+// onDemand=false => once started, keep running even with zero clients
+func (s *FFmpegSession) SetOnDemand(onDemand bool) {
+	s.onDemandMux.Lock()
+	s.onDemand = onDemand
+	s.onDemandMux.Unlock()
+}
+
+// IsOnDemand returns current on-demand mode.
+func (s *FFmpegSession) IsOnDemand() bool {
+	s.onDemandMux.RLock()
+	defer s.onDemandMux.RUnlock()
+	return s.onDemand
 }
 
 // AddClient adds a client to FFmpeg session
@@ -379,22 +398,24 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		hasClients := len(s.clients) > 0
 		s.clientsMux.RUnlock()
 		
-		// If we still have clients and context not cancelled, try to restart
+		// If we should keep the stream running (clients exist OR on-demand disabled)
+		// and context not cancelled, try to restart.
 		select {
 		case <-s.ctx.Done():
 			// Context cancelled, normal shutdown
 			log.Printf("⏹️  FFmpeg stopped (shutdown): %s", s.ID)
 		default:
-			if hasClients {
+			keepRunning := hasClients || !s.IsOnDemand()
+			if keepRunning {
 				// Check if stream is running for less than 30 seconds (likely offline/bad stream)
 				runDuration := time.Since(s.startTime)
 				
 				// Increment retry count if failed quickly (< 30 seconds)
 				if runDuration < 30*time.Second {
-				s.retryCount++
-				s.lastFailTime = time.Now()
-				log.Printf("⚠️  FFmpeg died after %v for %s (retry: %d/2)", runDuration, s.ID, s.retryCount)
-			} else {
+					s.retryCount++
+					s.lastFailTime = time.Now()
+					log.Printf("⚠️  FFmpeg died after %v for %s (retry: %d/2)", runDuration, s.ID, s.retryCount)
+				} else {
 					// Reset retry count if stream ran successfully for > 30 seconds
 					s.retryCount = 0
 				}
@@ -421,12 +442,11 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 				s.isActive = false
 				s.activeMux.Unlock()
 				
-				// Restart if still have clients and not blacklisted
+				// Restart if should keep running and not blacklisted.
 				s.clientsMux.RLock()
 				stillHasClients := len(s.clients) > 0
 				s.clientsMux.RUnlock()
-				
-				if stillHasClients && !s.isBlacklisted {
+				if (stillHasClients || !s.IsOnDemand()) && !s.isBlacklisted {
 					log.Printf("🔄 Auto-restarting FFmpeg: %s (attempt %d/5)", s.ID, s.retryCount+1)
 					go s.Start()
 				}
@@ -475,6 +495,10 @@ func (m *FFmpegManager) monitorSessions() {
 		m.sessionsMux.Lock()
 		for streamID, session := range m.sessions {
 			if session.GetClientCount() == 0 {
+				// If on-demand is disabled, keep the FFmpeg session running.
+				if !session.IsOnDemand() {
+					continue
+				}
 				idleTime := time.Since(session.lastActivity)
 				if idleTime > m.idleTimeout {
 					log.Printf("⏰ FFmpeg session idle for %v, stopping: %s", idleTime, streamID)

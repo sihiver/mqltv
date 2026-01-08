@@ -491,6 +491,14 @@ func StreamRelay(w http.ResponseWriter, r *http.Request) {
 	ffmpegManager := streaming.GetFFmpegManager()
 	session := ffmpegManager.GetOrCreateFFmpegSession(path, urls, "mpegts")
 
+	// Apply per-channel on_demand flag when this relay represents a channel.
+	if channelID.Valid {
+		var onDemandInt int
+		if err := database.DB.QueryRow("SELECT on_demand FROM channels WHERE id = ?", channelID.Int64).Scan(&onDemandInt); err == nil {
+			session.SetOnDemand(onDemandInt == 1)
+		}
+	}
+
 	// Generate unique client ID
 	clientID := fmt.Sprintf("%x", md5.Sum([]byte(r.RemoteAddr+r.UserAgent())))
 
@@ -1037,6 +1045,23 @@ func UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If on_demand was updated, apply it immediately to any active stream sessions.
+	if req.OnDemand != nil {
+		ffmpegManager := streaming.GetFFmpegManager()
+		if session := ffmpegManager.GetSession(fmt.Sprintf("channel_%d", c.ID)); session != nil {
+			session.SetOnDemand(*req.OnDemand)
+		}
+		if session := ffmpegManager.GetSession(fmt.Sprintf("channel_%d_hls", c.ID)); session != nil {
+			session.SetOnDemand(*req.OnDemand)
+		}
+		if session := ffmpegManager.GetSession(fmt.Sprintf("channel-%d", c.ID)); session != nil {
+			session.SetOnDemand(*req.OnDemand)
+		}
+		if session := ffmpegManager.GetSession(fmt.Sprintf("channel-%d_hls", c.ID)); session != nil {
+			session.SetOnDemand(*req.OnDemand)
+		}
+	}
+
 	channel := map[string]interface{}{
 		"id":            c.ID,
 		"playlist_id":   c.PlaylistID,
@@ -1285,7 +1310,8 @@ func ProxyChannel(w http.ResponseWriter, r *http.Request) {
 
 	var url string
 	var active int
-	err = database.DB.QueryRow("SELECT url, active FROM channels WHERE id = ?", channelID).Scan(&url, &active)
+	var onDemandInt int
+	err = database.DB.QueryRow("SELECT url, active, on_demand FROM channels WHERE id = ?", channelID).Scan(&url, &active, &onDemandInt)
 	if err == sql.ErrNoRows {
 		http.Error(w, "Channel not found", http.StatusNotFound)
 		return
@@ -1303,6 +1329,7 @@ func ProxyChannel(w http.ResponseWriter, r *http.Request) {
 	ffmpegManager := streaming.GetFFmpegManager()
 	sessionID := fmt.Sprintf("channel_%d", channelID)
 	session := ffmpegManager.GetOrCreateFFmpegSession(sessionID, []string{url}, "mpegts")
+	session.SetOnDemand(onDemandInt == 1)
 
 	clientID := fmt.Sprintf("%x", md5.Sum([]byte(r.RemoteAddr+r.UserAgent())))
 	dataChan, err := session.AddClient(clientID, r.RemoteAddr)
@@ -1405,6 +1432,16 @@ func StreamRelayHLS(w http.ResponseWriter, r *http.Request) {
 	ffmpegManager := streaming.GetFFmpegManager()
 	sessionID := path + "_hls"
 	session := ffmpegManager.GetOrCreateFFmpegSession(sessionID, urls, "hls")
+
+	// Apply per-channel on_demand flag when this relay represents a channel.
+	if strings.HasPrefix(path, "channel-") {
+		if id, err := strconv.Atoi(strings.TrimPrefix(path, "channel-")); err == nil {
+			var onDemandInt int
+			if err := database.DB.QueryRow("SELECT on_demand FROM channels WHERE id = ?", id).Scan(&onDemandInt); err == nil {
+				session.SetOnDemand(onDemandInt == 1)
+			}
+		}
+	}
 
 	clientID := fmt.Sprintf("%x", md5.Sum([]byte(r.RemoteAddr+r.UserAgent())))
 	dataChan, err := session.AddClient(clientID, r.RemoteAddr)
@@ -1509,8 +1546,12 @@ func GetStreamStatus(w http.ResponseWriter, r *http.Request) {
 
 	for _, session := range sessions {
 		stats := session.GetStats()
-		// Only include active sessions with clients
-		if session.IsActive() && session.GetClientCount() > 0 {
+		clients := session.GetClientCount()
+
+		// Include:
+		// - active sessions with clients (normal on-demand behavior)
+		// - active sessions where on-demand is disabled (keep running even with 0 clients)
+		if session.IsActive() && (clients > 0 || !session.IsOnDemand()) {
 			status = append(status, stats)
 			if bytesRead, ok := stats["bytes_read"].(uint64); ok {
 				totalBytesRead += bytesRead
@@ -1601,7 +1642,8 @@ func ProxyChannelHLS(w http.ResponseWriter, r *http.Request) {
 
 	var url string
 	var active int
-	err = database.DB.QueryRow("SELECT url, active FROM channels WHERE id = ?", channelID).Scan(&url, &active)
+	var onDemandInt int
+	err = database.DB.QueryRow("SELECT url, active, on_demand FROM channels WHERE id = ?", channelID).Scan(&url, &active, &onDemandInt)
 	if err == sql.ErrNoRows {
 		http.Error(w, "Channel not found", http.StatusNotFound)
 		return
@@ -1619,6 +1661,7 @@ func ProxyChannelHLS(w http.ResponseWriter, r *http.Request) {
 	ffmpegManager := streaming.GetFFmpegManager()
 	sessionID := fmt.Sprintf("channel_%d_hls", channelID)
 	session := ffmpegManager.GetOrCreateFFmpegSession(sessionID, []string{url}, "hls")
+	session.SetOnDemand(onDemandInt == 1)
 
 	clientID := fmt.Sprintf("%x", md5.Sum([]byte(r.RemoteAddr+r.UserAgent())))
 	dataChan, err := session.AddClient(clientID, r.RemoteAddr)
