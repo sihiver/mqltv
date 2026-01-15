@@ -366,7 +366,9 @@ func SetUserExpired(w http.ResponseWriter, r *http.Request) {
 	userID := vars["id"]
 
 	var req struct {
-		Days int `json:"days"` // negative = expired, positive = extend
+		Days      *int    `json:"days"`       // negative = expired, positive = extend
+		ExpiresAt *string `json:"expires_at"` // RFC3339 preferred (e.g. 2026-01-15T12:34:56Z). Also accepts YYYY-MM-DD.
+		Clear     bool    `json:"clear"`      // when true, removes expiration (expires_at = NULL)
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -374,7 +376,43 @@ func SetUserExpired(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expiresAt := time.Now().AddDate(0, 0, req.Days)
+	if req.Clear {
+		_, err := database.DB.Exec("UPDATE users SET expires_at = NULL WHERE id = ?", userID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    0,
+			"message": "User expiration cleared",
+			"data": map[string]interface{}{
+				"expires_at": nil,
+			},
+		})
+		return
+	}
+
+	var expiresAt time.Time
+	if req.ExpiresAt != nil && strings.TrimSpace(*req.ExpiresAt) != "" {
+		value := strings.TrimSpace(*req.ExpiresAt)
+		// Try RFC3339 first
+		if parsed, err := time.Parse(time.RFC3339, value); err == nil {
+			expiresAt = parsed
+		} else if parsed, err := time.ParseInLocation("2006-01-02", value, time.Local); err == nil {
+			// Treat date-only as end of day in local time
+			expiresAt = time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 23, 59, 59, 0, time.Local)
+		} else {
+			http.Error(w, "Invalid expires_at format (use RFC3339 or YYYY-MM-DD)", http.StatusBadRequest)
+			return
+		}
+	} else if req.Days != nil {
+		expiresAt = time.Now().AddDate(0, 0, *req.Days)
+	} else {
+		http.Error(w, "Either days, expires_at, or clear=true is required", http.StatusBadRequest)
+		return
+	}
 
 	_, err := database.DB.Exec("UPDATE users SET expires_at = ? WHERE id = ?", expiresAt, userID)
 	if err != nil {
@@ -384,9 +422,11 @@ func SetUserExpired(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":    true,
-		"message":    "User expiration updated",
-		"expires_at": expiresAt,
+		"code":    0,
+		"message": "User expiration updated",
+		"data": map[string]interface{}{
+			"expires_at": expiresAt,
+		},
 	})
 }
 
@@ -822,7 +862,7 @@ func CheckUser(w http.ResponseWriter, r *http.Request) {
 		SELECT id, username, password, full_name, email, max_connections, is_active, 
 		       created_at, activated_at, expires_at, last_login, notes
 		FROM users WHERE username = ?
-	`, username).Scan(&user.ID, &user.Username, &passwordHash, &user.FullName, 
+	`, username).Scan(&user.ID, &user.Username, &passwordHash, &user.FullName,
 		&user.Email, &user.MaxConnections, &user.IsActive, &user.CreatedAt,
 		&user.ActivatedAt, &user.ExpiresAt, &user.LastLogin, &user.Notes)
 
