@@ -69,6 +69,9 @@ const profileForm = ref({
 const loading = ref(false)
 const saving = ref(false)
 
+// Keep snapshots to detect changes (avoid unnecessary confirm prompts)
+const lastLoadedFFmpegSettingsJson = ref('')
+
 // Load settings
 const loadSettings = async () => {
   loading.value = true
@@ -85,6 +88,9 @@ const loadSettings = async () => {
       }
       if (res.data.ffmpeg) {
         Object.assign(ffmpegSettings.value, res.data.ffmpeg)
+
+        // Snapshot after applying backend values
+        lastLoadedFFmpegSettingsJson.value = JSON.stringify(ffmpegSettings.value)
       }
       if (res.data.stream) {
         Object.assign(streamSettings.value, res.data.stream)
@@ -126,6 +132,16 @@ const saveSystemSettings = async () => {
 const saveFFmpegSettings = async () => {
   saving.value = true
   try {
+    await ElMessageBox.confirm(
+      'Save FFmpeg settings now? Some options may only affect new streams unless you restart streams.',
+      'Confirm Save',
+      {
+        confirmButtonText: 'Save',
+        cancelButtonText: 'Cancel',
+        type: 'warning'
+      }
+    )
+
     await request.post({
       url: '/api/settings',
       data: {
@@ -133,8 +149,13 @@ const saveFFmpegSettings = async () => {
         settings: ffmpegSettings.value
       }
     })
+
+    // Update snapshot after successful save
+    lastLoadedFFmpegSettingsJson.value = JSON.stringify(ffmpegSettings.value)
     ElMessage.success('FFmpeg settings saved successfully')
   } catch (error) {
+    // Cancel click throws; keep it quiet.
+    if ((error as any)?.toString?.()?.includes('cancel')) return
     ElMessage.error('Failed to save FFmpeg settings')
   } finally {
     saving.value = false

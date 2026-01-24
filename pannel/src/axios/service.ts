@@ -4,10 +4,14 @@ import { defaultRequestInterceptors, defaultResponseInterceptors } from './confi
 import { AxiosInstance, InternalAxiosRequestConfig, RequestConfig, AxiosResponse } from './types'
 import { ElMessage } from 'element-plus'
 import { REQUEST_TIMEOUT } from '@/constants'
+import { useUserStoreWithOut } from '@/store/modules/user'
+import router from '@/router'
 
 export const PATH_URL = import.meta.env.VITE_API_BASE_PATH
 
 const abortControllerMap: Map<string, AbortController> = new Map()
+
+let isHandlingAuthFailure = false
 
 const axiosInstance: AxiosInstance = axios.create({
   timeout: REQUEST_TIMEOUT,
@@ -39,8 +43,27 @@ axiosInstance.interceptors.response.use(
       // Server responded with error status
       const status = error.response.status
       if (status === 401) {
-        // Handle unauthorized
-        ElMessage.error('Authentication failed')
+        // Session expired / unauthorized: redirect to login
+        if (!isHandlingAuthFailure && router.currentRoute.value.path !== '/login') {
+          isHandlingAuthFailure = true
+          ElMessage.error('Session expired. Please login again.')
+          const userStore = useUserStoreWithOut()
+          userStore.logout()
+          setTimeout(() => {
+            isHandlingAuthFailure = false
+          }, 1000)
+        }
+      } else if (status === 403) {
+        // Forbidden: treat as auth failure for admin-protected APIs
+        if (!isHandlingAuthFailure && router.currentRoute.value.path !== '/login') {
+          isHandlingAuthFailure = true
+          ElMessage.error('Access denied. Please login again.')
+          const userStore = useUserStoreWithOut()
+          userStore.logout()
+          setTimeout(() => {
+            isHandlingAuthFailure = false
+          }, 1000)
+        }
       } else if (status === 404) {
         ElMessage.error('Resource not found')
       } else {
