@@ -2,19 +2,87 @@ package streaming
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"iptv-panel/database"
 	"log"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
+
+func getFFmpegSettingInt(key string, defaultValue int) int {
+	if database.DB == nil {
+		return defaultValue
+	}
+
+	var value string
+	err := database.DB.QueryRow(
+		"SELECT value FROM settings WHERE key = ? AND category = 'ffmpeg'",
+		key,
+	).Scan(&value)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return defaultValue
+		}
+		return defaultValue
+	}
+
+	n, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return defaultValue
+	}
+	return n
+}
+
+func getFFmpegExecutable() string {
+	if database.DB == nil {
+		return "ffmpeg"
+	}
+	var ffmpegPath string
+	err := database.DB.QueryRow(
+		"SELECT value FROM settings WHERE key = 'ffmpeg_path' AND category = 'ffmpeg'",
+	).Scan(&ffmpegPath)
+	if err != nil {
+		return "ffmpeg"
+	}
+	ffmpegPath = strings.TrimSpace(ffmpegPath)
+	if ffmpegPath == "" {
+		return "ffmpeg"
+	}
+	return ffmpegPath
+}
+
+func getFFmpegWatchdogConfig() (noDataTimeout time.Duration, interval time.Duration) {
+	noDataTimeoutSeconds := getFFmpegSettingInt("no_data_timeout_seconds", 20)
+	watchdogIntervalSeconds := getFFmpegSettingInt("watchdog_interval_seconds", 5)
+
+	// Allow disabling watchdog entirely with 0.
+	if noDataTimeoutSeconds < 0 {
+		noDataTimeoutSeconds = 20
+	}
+	if noDataTimeoutSeconds > 600 {
+		noDataTimeoutSeconds = 600
+	}
+
+	if watchdogIntervalSeconds < 1 {
+		watchdogIntervalSeconds = 1
+	}
+	if watchdogIntervalSeconds > 60 {
+		watchdogIntervalSeconds = 60
+	}
+
+	return time.Duration(noDataTimeoutSeconds) * time.Second, time.Duration(watchdogIntervalSeconds) * time.Second
+}
 
 // FFmpegSession manages FFmpeg-based streaming
 type FFmpegSession struct {
 	ID            string
 	SourceURLs    []string
 	OutputFormat  string // "mpegts", "hls", "copy"
+	owner         *FFmpegManager
 	onDemand      bool
 	onDemandMux   sync.RWMutex
 	ctx           context.Context
@@ -26,6 +94,8 @@ type FFmpegSession struct {
 	activeMux     sync.RWMutex
 	lastActivity  time.Time
 	startTime     time.Time
+	lastDataTime  time.Time
+	dataTimeMux   sync.RWMutex
 	pipeWriter    *StreamPipe
 	bytesRead     uint64 // Total bytes from source
 	bytesWritten  uint64 // Total bytes to clients
@@ -95,6 +165,7 @@ func (m *FFmpegManager) GetOrCreateFFmpegSession(streamID string, sourceURLs []s
 		ID:           streamID,
 		SourceURLs:   sourceURLs,
 		OutputFormat: format,
+		owner:        m,
 		onDemand:     true,
 		ctx:          ctx,
 		cancel:       cancel,
@@ -116,6 +187,21 @@ func (m *FFmpegManager) GetOrCreateFFmpegSession(streamID string, sourceURLs []s
 	log.Printf("🎬 Created FFmpeg session: %s (format: %s)", streamID, format)
 
 	return session
+}
+
+// DeleteSession stops and removes a session from the manager.
+// Safe to call from any goroutine.
+func (m *FFmpegManager) DeleteSession(streamID string) {
+	m.sessionsMux.Lock()
+	session, ok := m.sessions[streamID]
+	if ok {
+		delete(m.sessions, streamID)
+	}
+	m.sessionsMux.Unlock()
+
+	if ok {
+		session.Stop()
+	}
 }
 
 // SetOnDemand configures whether this session should auto-stop when idle.
@@ -213,6 +299,9 @@ func (s *FFmpegSession) Start() {
 	}
 	s.isActive = true
 	s.startTime = time.Now() // Set start time here
+	s.dataTimeMux.Lock()
+	s.lastDataTime = s.startTime
+	s.dataTimeMux.Unlock()
 	s.activeMux.Unlock()
 
 	log.Printf("▶️  Starting FFmpeg stream: %s", s.ID)
@@ -233,6 +322,8 @@ func (s *FFmpegSession) Start() {
 
 // startFFmpeg starts FFmpeg process
 func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
+	_, watchdogInterval := getFFmpegWatchdogConfig()
+
 	// Build FFmpeg command optimized for multiple concurrent streams
 	args := []string{
 		"-threads", "1",               // Limit to 1 thread per stream
@@ -287,7 +378,8 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		}
 	}
 
-	s.cmd = exec.CommandContext(s.ctx, "ffmpeg", args...)
+	ffmpegExe := getFFmpegExecutable()
+	s.cmd = exec.CommandContext(s.ctx, ffmpegExe, args...)
 	
 	stdout, err := s.cmd.StdoutPipe()
 	if err != nil {
@@ -307,6 +399,46 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 	}
 
 	log.Printf("✅ FFmpeg started for source: %s", sourceURL)
+
+	// Watchdog: if FFmpeg produces no output for a while (upstream stalled/down),
+	// stop & remove the session so it can be recreated when upstream is back.
+	// This re-reads settings periodically so updates apply without server restart.
+	go func() {
+		timer := time.NewTimer(watchdogInterval)
+		defer timer.Stop()
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-timer.C:
+				if !s.IsActive() {
+					return
+				}
+
+				currentNoDataTimeout, currentInterval := getFFmpegWatchdogConfig()
+				// Schedule next tick using latest interval.
+				timer.Reset(currentInterval)
+
+				// If disabled, just keep looping.
+				if currentNoDataTimeout <= 0 {
+					continue
+				}
+
+				s.dataTimeMux.RLock()
+				last := s.lastDataTime
+				s.dataTimeMux.RUnlock()
+				if !last.IsZero() && time.Since(last) > currentNoDataTimeout {
+					log.Printf("⚠️  No stream data for %v (upstream likely down). Stopping restream: %s", currentNoDataTimeout, s.ID)
+					if s.owner != nil {
+						s.owner.DeleteSession(s.ID)
+					} else {
+						s.Stop()
+					}
+					return
+				}
+			}
+		}
+	}()
 
 	// Read FFmpeg stderr in background (for logging errors)
 	go func() {
@@ -353,6 +485,10 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 				}
 				
 				if n > 0 {
+					s.dataTimeMux.Lock()
+					s.lastDataTime = time.Now()
+					s.dataTimeMux.Unlock()
+
 					data := make([]byte, n)
 					copy(data, buffer[:n])
 
@@ -423,15 +559,14 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 				// Blacklist if failed 2 times in a row
 				if s.retryCount >= 2 {
 					s.isBlacklisted = true
-					log.Printf("🚫 Channel %s blacklisted after %d consecutive failures. Source likely offline.", s.ID, s.retryCount)
-					
-					// Disconnect all clients
-					s.clientsMux.Lock()
-					for clientID := range s.clients {
-						delete(s.clients, clientID)
+					log.Printf("🚫 Channel %s offline after %d consecutive failures; stopping restream.", s.ID, s.retryCount)
+
+					// Stop & remove the session so it can be recreated later when upstream is back.
+					if s.owner != nil {
+						s.owner.DeleteSession(s.ID)
+					} else {
+						s.Stop()
 					}
-					s.clientsMux.Unlock()
-					
 					return
 				}
 				

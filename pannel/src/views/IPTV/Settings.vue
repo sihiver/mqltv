@@ -12,6 +12,7 @@ import {
   ElSwitch,
   ElButton,
   ElMessage,
+  ElMessageBox,
   ElDivider,
   ElTag
 } from 'element-plus'
@@ -36,6 +37,8 @@ const ffmpegSettings = ref({
   ffmpeg_path: '/usr/bin/ffmpeg',
   buffer_size: 2048,
   idle_timeout: 60,
+  no_data_timeout_seconds: 20,
+  watchdog_interval_seconds: 5,
   max_streams: 100,
   enable_hls: true,
   hls_segment_duration: 6
@@ -177,6 +180,31 @@ const clearCache = async () => {
     ElMessage.success('Cache cleared successfully')
   } catch (error) {
     ElMessage.error('Failed to clear cache')
+  }
+}
+
+// Restart all active streams (apply FFmpeg/settings changes immediately)
+const restartStreams = async () => {
+  try {
+    await ElMessageBox.confirm(
+      'This will stop current FFmpeg sessions and restart streams that were active/in-use. Continue?',
+      'Restart Streams',
+      {
+        confirmButtonText: 'Restart',
+        cancelButtonText: 'Cancel',
+        type: 'warning'
+      }
+    )
+
+    ElMessage.info('Restarting streams...')
+    const res = await request.post({ url: '/api/settings/restart-streams' })
+    const stopped = res?.data?.stopped ?? 0
+    const restarted = res?.data?.restarted ?? 0
+    ElMessage.success(`Restart done. Stopped: ${stopped}, Restarted: ${restarted}`)
+  } catch (error) {
+    // Cancel click throws; keep it quiet.
+    if ((error as any)?.toString?.()?.includes('cancel')) return
+    ElMessage.error('Failed to restart streams')
   }
 }
 
@@ -353,6 +381,29 @@ onMounted(() => {
               />
             </ElFormItem>
 
+            <ElFormItem label="Upstream No-Data Timeout (seconds)">
+              <div style="width: 100%">
+                <ElInputNumber
+                  v-model="ffmpegSettings.no_data_timeout_seconds"
+                  :min="0"
+                  :max="600"
+                  style="width: 100%"
+                />
+                <div style="margin-top: 6px">
+                  <ElTag type="info" size="small">0 = disable watchdog</ElTag>
+                </div>
+              </div>
+            </ElFormItem>
+
+            <ElFormItem label="Watchdog Interval (seconds)">
+              <ElInputNumber
+                v-model="ffmpegSettings.watchdog_interval_seconds"
+                :min="1"
+                :max="60"
+                style="width: 100%"
+              />
+            </ElFormItem>
+
             <ElFormItem label="Max Concurrent Streams">
               <ElInputNumber
                 v-model="ffmpegSettings.max_streams"
@@ -384,6 +435,10 @@ onMounted(() => {
                 <ElButton @click="testFFmpeg">
                   <Icon icon="ep:video-play" />
                   Test FFmpeg
+                </ElButton>
+                <ElButton type="warning" @click="restartStreams">
+                  <Icon icon="ep:refresh" />
+                  Restart Streams
                 </ElButton>
               </div>
             </ElFormItem>

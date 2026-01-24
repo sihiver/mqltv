@@ -158,6 +158,8 @@ func createDefaultSettings() {
 			"ffmpeg_path":            "/usr/bin/ffmpeg",
 			"buffer_size":            "2048",
 			"idle_timeout":           "60",
+			"no_data_timeout_seconds": "20",
+			"watchdog_interval_seconds": "5",
 			"max_streams":            "100",
 			"enable_hls":             "true",
 			"hls_segment_duration":   "6",
