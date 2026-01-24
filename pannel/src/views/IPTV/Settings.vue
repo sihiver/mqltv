@@ -37,6 +37,10 @@ const ffmpegSettings = ref({
   ffmpeg_path: '/usr/bin/ffmpeg',
   buffer_size: 2048,
   idle_timeout: 60,
+  startup_analyzeduration_ms: 5000,
+  startup_probesize_kb: 5000,
+  input_timeout_seconds: 10,
+  reconnect_delay_max_seconds: 5,
   no_data_timeout_seconds: 20,
   watchdog_interval_seconds: 5,
   max_streams: 100,
@@ -397,7 +401,59 @@ onMounted(() => {
               <ElInputNumber
                 v-model="ffmpegSettings.idle_timeout"
                 :min="30"
-                :max="300"
+                :max="86400"
+                style="width: 100%"
+              />
+            </ElFormItem>
+
+            <ElDivider content-position="left">On-Demand Start Tuning</ElDivider>
+
+            <ElFormItem label="Analyze Duration (ms)">
+              <div style="width: 100%">
+                <ElInputNumber
+                  v-model="ffmpegSettings.startup_analyzeduration_ms"
+                  :min="100"
+                  :max="20000"
+                  style="width: 100%"
+                />
+                <div style="margin-top: 6px">
+                  <ElTag type="info" size="small">
+                    Lower = faster start, but may fail on some streams
+                  </ElTag>
+                </div>
+              </div>
+            </ElFormItem>
+
+            <ElFormItem label="Probe Size (KB)">
+              <div style="width: 100%">
+                <ElInputNumber
+                  v-model="ffmpegSettings.startup_probesize_kb"
+                  :min="256"
+                  :max="20000"
+                  style="width: 100%"
+                />
+                <div style="margin-top: 6px">
+                  <ElTag type="info" size="small">
+                    Lower = faster start, but may reduce detection accuracy
+                  </ElTag>
+                </div>
+              </div>
+            </ElFormItem>
+
+            <ElFormItem label="Input Timeout (seconds)">
+              <ElInputNumber
+                v-model="ffmpegSettings.input_timeout_seconds"
+                :min="1"
+                :max="60"
+                style="width: 100%"
+              />
+            </ElFormItem>
+
+            <ElFormItem label="Reconnect Delay Max (seconds)">
+              <ElInputNumber
+                v-model="ffmpegSettings.reconnect_delay_max_seconds"
+                :min="1"
+                :max="30"
                 style="width: 100%"
               />
             </ElFormItem>
@@ -448,16 +504,21 @@ onMounted(() => {
             </ElFormItem>
 
             <ElFormItem>
-              <div style="display: flex; gap: 8px">
-                <ElButton type="primary" @click="saveFFmpegSettings" :loading="saving">
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; width: 100%">
+                <ElButton
+                  type="primary"
+                  @click="saveFFmpegSettings"
+                  :loading="saving"
+                  style="flex: 0 0 auto"
+                >
                   <Icon icon="ep:upload" />
                   Save FFmpeg Settings
                 </ElButton>
-                <ElButton @click="testFFmpeg">
+                <ElButton @click="testFFmpeg" style="flex: 0 0 auto">
                   <Icon icon="ep:video-play" />
                   Test FFmpeg
                 </ElButton>
-                <ElButton type="warning" @click="restartStreams">
+                <ElButton type="warning" @click="restartStreams" style="flex: 0 0 auto">
                   <Icon icon="ep:refresh" />
                   Restart Streams
                 </ElButton>

@@ -77,6 +77,56 @@ func getFFmpegWatchdogConfig() (noDataTimeout time.Duration, interval time.Durat
 	return time.Duration(noDataTimeoutSeconds) * time.Second, time.Duration(watchdogIntervalSeconds) * time.Second
 }
 
+func getFFmpegIdleTimeout() time.Duration {
+	idleSeconds := getFFmpegSettingInt("idle_timeout", 60)
+	if idleSeconds < 5 {
+		idleSeconds = 5
+	}
+	if idleSeconds > 86400 {
+		idleSeconds = 86400
+	}
+	return time.Duration(idleSeconds) * time.Second
+}
+
+func getFFmpegStartupProbeConfig() (reconnectDelayMaxSeconds int, timeoutMicros int, analyzeMicros int, probeBytes int) {
+	reconnectDelayMaxSeconds = getFFmpegSettingInt("reconnect_delay_max_seconds", 5)
+	if reconnectDelayMaxSeconds < 1 {
+		reconnectDelayMaxSeconds = 1
+	}
+	if reconnectDelayMaxSeconds > 30 {
+		reconnectDelayMaxSeconds = 30
+	}
+
+	inputTimeoutSeconds := getFFmpegSettingInt("input_timeout_seconds", 10)
+	if inputTimeoutSeconds < 1 {
+		inputTimeoutSeconds = 1
+	}
+	if inputTimeoutSeconds > 60 {
+		inputTimeoutSeconds = 60
+	}
+	timeoutMicros = inputTimeoutSeconds * 1000 * 1000
+
+	analyzeMs := getFFmpegSettingInt("startup_analyzeduration_ms", 5000)
+	if analyzeMs < 100 {
+		analyzeMs = 100
+	}
+	if analyzeMs > 20000 {
+		analyzeMs = 20000
+	}
+	analyzeMicros = analyzeMs * 1000
+
+	probeKB := getFFmpegSettingInt("startup_probesize_kb", 5000)
+	if probeKB < 256 {
+		probeKB = 256
+	}
+	if probeKB > 20000 {
+		probeKB = 20000
+	}
+	probeBytes = probeKB * 1024
+
+	return reconnectDelayMaxSeconds, timeoutMicros, analyzeMicros, probeBytes
+}
+
 // FFmpegSession manages FFmpeg-based streaming
 type FFmpegSession struct {
 	ID            string
@@ -323,18 +373,19 @@ func (s *FFmpegSession) Start() {
 // startFFmpeg starts FFmpeg process
 func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 	_, watchdogInterval := getFFmpegWatchdogConfig()
+	reconnectDelayMaxSeconds, timeoutMicros, analyzeMicros, probeBytes := getFFmpegStartupProbeConfig()
 
 	// Build FFmpeg command optimized for multiple concurrent streams
 	args := []string{
 		"-threads", "1", // Limit to 1 thread per stream
 		"-reconnect", "1", // Enable auto reconnect
 		"-reconnect_streamed", "1", // Reconnect for streamed protocols
-		"-reconnect_delay_max", "5", // Max 5 seconds between reconnects
-		"-timeout", "10000000", // 10 second timeout (in microseconds)
+		"-reconnect_delay_max", strconv.Itoa(reconnectDelayMaxSeconds), // Max seconds between reconnects
+		"-timeout", strconv.Itoa(timeoutMicros), // Input timeout (microseconds)
 		"-fflags", "+genpts+discardcorrupt", // Generate PTS + discard corrupt packets
 		"-flags", "low_delay", // Low delay flag
-		"-analyzeduration", "5000000", // 5 seconds analysis (detect all streams)
-		"-probesize", "5000000", // 5MB probe (ensure video detected)
+		"-analyzeduration", strconv.Itoa(analyzeMicros), // Analysis duration (microseconds)
+		"-probesize", strconv.Itoa(probeBytes), // Probe size (bytes)
 		"-i", sourceURL, // Input URL
 		"-map", "0:v?", // Map video stream (optional, won't fail if missing)
 		"-map", "0:a?", // Map audio stream (optional, won't fail if missing)
@@ -356,12 +407,12 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			"-threads", "1",
 			"-reconnect", "1",
 			"-reconnect_streamed", "1",
-			"-reconnect_delay_max", "5",
-			"-timeout", "10000000",
+			"-reconnect_delay_max", strconv.Itoa(reconnectDelayMaxSeconds),
+			"-timeout", strconv.Itoa(timeoutMicros),
 			"-fflags", "+genpts+discardcorrupt",
 			"-flags", "low_delay",
-			"-analyzeduration", "5000000", // 5 seconds analysis
-			"-probesize", "5000000", // 5MB probe
+			"-analyzeduration", strconv.Itoa(analyzeMicros),
+			"-probesize", strconv.Itoa(probeBytes),
 			"-i", sourceURL,
 			"-map", "0:v?", // Map video (optional)
 			"-map", "0:a?", // Map audio (optional)
@@ -627,6 +678,9 @@ func (m *FFmpegManager) monitorSessions() {
 	defer ticker.Stop()
 
 	for range ticker.C {
+		// Apply idle timeout setting live (helps on-demand feel faster by keeping sessions warm longer).
+		m.idleTimeout = getFFmpegIdleTimeout()
+
 		m.sessionsMux.Lock()
 		for streamID, session := range m.sessions {
 			if session.GetClientCount() == 0 {
