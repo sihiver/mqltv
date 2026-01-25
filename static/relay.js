@@ -5,7 +5,8 @@ console.log('Relay module loaded');
 async function loadRelays() {
     try {
         const response = await fetch('/api/relays');
-        const relays = await response.json();
+        const payload = await response.json();
+        const relays = Array.isArray(payload) ? payload : (payload && payload.data) ? payload.data : [];
         
         const container = document.getElementById('relaysList');
         if (relays.length === 0) {

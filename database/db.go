@@ -175,6 +175,12 @@ func createDefaultSettings() {
 			"enable_transcode": "false",
 			"default_format":   "mpegts",
 		},
+		// Cumulative counters for dashboard. Stored in DB so totals don't reset to 0
+		// just because all streams are currently stopped.
+		"stats": {
+			"stats_total_bytes_read":  "0",
+			"stats_total_bytes_write": "0",
+		},
 	}
 
 	for category, settings := range defaultSettings {

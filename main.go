@@ -136,6 +136,7 @@ func main() {
 	api.HandleFunc("/settings/test-ffmpeg", handlers.TestFFmpeg).Methods("POST")
 	api.HandleFunc("/settings/clear-cache", handlers.ClearHLSCache).Methods("POST")
 	api.HandleFunc("/settings/restart-streams", handlers.RestartStreams).Methods("POST")
+	api.HandleFunc("/settings/reset-bandwidth", handlers.ResetTotalBandwidth).Methods("POST")
 
 	// Generate playlist
 	api.HandleFunc("/generate-playlist", handlers.GenerateUserPlaylist).Methods("POST")

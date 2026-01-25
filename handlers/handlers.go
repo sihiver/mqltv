@@ -361,12 +361,31 @@ func GetRelays(w http.ResponseWriter, r *http.Request) {
 func CreateRelay(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name       string   `json:"name"`
+		SourceURL  string   `json:"source_url"`
 		SourceURLs []string `json:"source_urls"`
 		OutputPath string   `json:"output_path"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Backward/alternate compatibility: allow single source_url
+	if len(req.SourceURLs) == 0 && req.SourceURL != "" {
+		req.SourceURLs = []string{req.SourceURL}
+	}
+
+	if req.OutputPath == "" {
+		http.Error(w, "output_path is required", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" {
+		// Keep old clients working (e.g. legacy static UI)
+		req.Name = req.OutputPath
+	}
+	if len(req.SourceURLs) == 0 {
+		http.Error(w, "source_urls is required", http.StatusBadRequest)
 		return
 	}
 
@@ -383,8 +402,12 @@ func CreateRelay(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"id":      relayID,
+		"code": 0,
+		"data": map[string]interface{}{
+			"success": true,
+			"id":      relayID,
+		},
+		"message": "Relay created successfully",
 	})
 }
 
@@ -400,7 +423,11 @@ func DeleteRelay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    0,
+		"data":    map[string]bool{"success": true},
+		"message": "Relay deleted successfully",
+	})
 }
 
 // StreamRelay handles relay streaming with FFmpeg (on-demand multi-client)
@@ -1541,8 +1568,10 @@ func GetStreamStatus(w http.ResponseWriter, r *http.Request) {
 	sessions := ffmpegManager.GetAllSessions()
 
 	status := make([]map[string]interface{}, 0, len(sessions))
-	var totalBytesRead uint64
-	var totalBytesWritten uint64
+	// Start from persisted totals (includes bytes from sessions that already stopped).
+	persistRead, persistWrite := ffmpegManager.GetPersistedTotals()
+	totalBytesRead := persistRead
+	totalBytesWritten := persistWrite
 
 	for _, session := range sessions {
 		stats := session.GetStats()

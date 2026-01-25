@@ -211,3 +211,16 @@ func RestartStreams(w http.ResponseWriter, r *http.Request) {
 		"message": "Streams restart triggered",
 	})
 }
+
+// ResetTotalBandwidth resets the persisted total upload/download counters.
+// Note: if streams are currently running, totals may start increasing again immediately.
+func ResetTotalBandwidth(w http.ResponseWriter, r *http.Request) {
+	manager := streaming.GetFFmpegManager()
+	manager.ResetPersistedTotals()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    0,
+		"message": "Total bandwidth counters reset",
+	})
+}

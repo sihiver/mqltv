@@ -37,6 +37,44 @@ func getFFmpegSettingInt(key string, defaultValue int) int {
 	return n
 }
 
+func getStatsSettingUint64(key string, defaultValue uint64) uint64 {
+	if database.DB == nil {
+		return defaultValue
+	}
+
+	var value string
+	err := database.DB.QueryRow(
+		"SELECT value FROM settings WHERE key = ? AND category = 'stats'",
+		key,
+	).Scan(&value)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return defaultValue
+		}
+		return defaultValue
+	}
+
+	n, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
+	if err != nil {
+		return defaultValue
+	}
+	return n
+}
+
+func setStatsSettingUint64(key string, value uint64) {
+	if database.DB == nil {
+		return
+	}
+
+	// Best-effort upsert.
+	_, _ = database.DB.Exec(
+		`INSERT INTO settings (key, value, category)
+		 VALUES (?, ?, 'stats')
+		 ON CONFLICT(key) DO UPDATE SET value = excluded.value, category = 'stats', updated_at = CURRENT_TIMESTAMP`,
+		key, strconv.FormatUint(value, 10),
+	)
+}
+
 func getFFmpegExecutable() string {
 	if database.DB == nil {
 		return "ffmpeg"
@@ -180,6 +218,12 @@ type FFmpegManager struct {
 	sessions    map[string]*FFmpegSession
 	sessionsMux sync.RWMutex
 	idleTimeout time.Duration
+
+	// Persisted totals across sessions (so dashboard totals don't drop to 0
+	// when all streams are currently stopped).
+	totalsMux           sync.Mutex
+	persistedBytesRead  uint64
+	persistedBytesWrite uint64
 }
 
 var (
@@ -194,9 +238,43 @@ func GetFFmpegManager() *FFmpegManager {
 			sessions:    make(map[string]*FFmpegSession),
 			idleTimeout: 60 * time.Second,
 		}
+		ffmpegManager.persistedBytesRead = getStatsSettingUint64("stats_total_bytes_read", 0)
+		ffmpegManager.persistedBytesWrite = getStatsSettingUint64("stats_total_bytes_write", 0)
 		go ffmpegManager.monitorSessions()
 	})
 	return ffmpegManager
+}
+
+func (m *FFmpegManager) addPersistedTotals(bytesRead, bytesWrite uint64) {
+	if bytesRead == 0 && bytesWrite == 0 {
+		return
+	}
+
+	m.totalsMux.Lock()
+	m.persistedBytesRead += bytesRead
+	m.persistedBytesWrite += bytesWrite
+	newRead := m.persistedBytesRead
+	newWrite := m.persistedBytesWrite
+	m.totalsMux.Unlock()
+
+	setStatsSettingUint64("stats_total_bytes_read", newRead)
+	setStatsSettingUint64("stats_total_bytes_write", newWrite)
+}
+
+func (m *FFmpegManager) GetPersistedTotals() (bytesRead uint64, bytesWrite uint64) {
+	m.totalsMux.Lock()
+	defer m.totalsMux.Unlock()
+	return m.persistedBytesRead, m.persistedBytesWrite
+}
+
+func (m *FFmpegManager) ResetPersistedTotals() {
+	m.totalsMux.Lock()
+	m.persistedBytesRead = 0
+	m.persistedBytesWrite = 0
+	m.totalsMux.Unlock()
+
+	setStatsSettingUint64("stats_total_bytes_read", 0)
+	setStatsSettingUint64("stats_total_bytes_write", 0)
 }
 
 // GetOrCreateFFmpegSession gets or creates FFmpeg session
@@ -250,6 +328,13 @@ func (m *FFmpegManager) DeleteSession(streamID string) {
 	m.sessionsMux.Unlock()
 
 	if ok {
+		// Capture counters before stopping.
+		session.bytesMux.RLock()
+		read := session.bytesRead
+		written := session.bytesWritten
+		session.bytesMux.RUnlock()
+		m.addPersistedTotals(read, written)
+
 		session.Stop()
 	}
 }
@@ -681,22 +766,28 @@ func (m *FFmpegManager) monitorSessions() {
 		// Apply idle timeout setting live (helps on-demand feel faster by keeping sessions warm longer).
 		m.idleTimeout = getFFmpegIdleTimeout()
 
-		m.sessionsMux.Lock()
+		// Collect sessions to stop outside the lock.
+		toDelete := make([]string, 0)
+		m.sessionsMux.RLock()
 		for streamID, session := range m.sessions {
-			if session.GetClientCount() == 0 {
-				// If on-demand is disabled, keep the FFmpeg session running.
-				if !session.IsOnDemand() {
-					continue
-				}
-				idleTime := time.Since(session.lastActivity)
-				if idleTime > m.idleTimeout {
-					log.Printf("⏰ FFmpeg session idle for %v, stopping: %s", idleTime, streamID)
-					session.Stop()
-					delete(m.sessions, streamID)
-				}
+			if session.GetClientCount() != 0 {
+				continue
+			}
+			// If on-demand is disabled, keep the FFmpeg session running.
+			if !session.IsOnDemand() {
+				continue
+			}
+			idleTime := time.Since(session.lastActivity)
+			if idleTime > m.idleTimeout {
+				toDelete = append(toDelete, streamID)
 			}
 		}
-		m.sessionsMux.Unlock()
+		m.sessionsMux.RUnlock()
+
+		for _, streamID := range toDelete {
+			log.Printf("⏰ FFmpeg session idle for %v, stopping: %s", m.idleTimeout, streamID)
+			m.DeleteSession(streamID)
+		}
 	}
 }
 
