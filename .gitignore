@@ -9,3 +9,7 @@ pannel/dist/
 pannel/.vscode/
 pannel/pnpm-lock.yaml
 pannel/package-lock.json
+
+# Generated playlists (runtime artifacts)
+generated_playlists/
+static/playlists/
