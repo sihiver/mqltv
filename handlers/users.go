@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -210,6 +211,28 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userID := vars["id"]
 
+	// Lookup username first so we can cleanup generated playlist files.
+	var username string
+	err := database.DB.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&username)
+	if err == sql.ErrNoRows {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"data":    nil,
+			"message": "User not found",
+		})
+		return
+	}
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"code":    1,
+			"data":    nil,
+			"message": "Failed to load user: " + err.Error(),
+		})
+		return
+	}
+
 	result, err := database.DB.Exec("DELETE FROM users WHERE id = ?", userID)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -232,11 +255,32 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Best-effort cleanup of generated playlists.
+	deleted := 0
+	trimmed := strings.TrimSpace(username)
+	// Prevent path traversal: only allow common username chars.
+	if regexp.MustCompile(`^[a-zA-Z0-9_-]+$`).MatchString(trimmed) {
+		paths := []string{
+			fmt.Sprintf("./generated_playlists/playlist-%s.m3u", trimmed),
+			fmt.Sprintf("./static/playlists/playlist-%s.m3u", trimmed),
+		}
+		for _, p := range paths {
+			if err := os.Remove(p); err == nil {
+				deleted++
+			} else if !os.IsNotExist(err) {
+				log.Printf("Failed to delete generated playlist %s: %v", p, err)
+			}
+		}
+	} else {
+		log.Printf("Skipping playlist cleanup for suspicious username: %q", username)
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"code": 0,
 		"data": map[string]interface{}{
-			"success": true,
+			"success":          true,
+			"playlists_deleted": deleted,
 		},
 		"message": "User deleted successfully",
 	})
