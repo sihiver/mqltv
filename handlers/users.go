@@ -279,7 +279,7 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"code": 0,
 		"data": map[string]interface{}{
-			"success":          true,
+			"success":           true,
 			"playlists_deleted": deleted,
 		},
 		"message": "User deleted successfully",
