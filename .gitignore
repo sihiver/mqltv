@@ -9,3 +9,13 @@ pannel/dist/
 pannel/.vscode/
 pannel/pnpm-lock.yaml
 pannel/package-lock.json
+
+# OpenWrt SDK/Toolchain artifacts
+openwrt-sdk-*/
+openwrt-sdk-*.tar.zst
+openwrt-toolchain-*/
+openwrt-toolchain-*.tar.zst
+
+# OpenWrt build outputs
+iptv-panel-armv7
+iptv-panel-openwrt-*
