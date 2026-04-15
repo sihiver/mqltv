@@ -5,6 +5,8 @@ import {
   ElRow,
   ElCol,
   ElCard,
+  ElTabs,
+  ElTabPane,
   ElForm,
   ElFormItem,
   ElInput,
@@ -12,6 +14,7 @@ import {
   ElSwitch,
   ElButton,
   ElMessage,
+  ElMessageBox,
   ElDivider,
   ElTag
 } from 'element-plus'
@@ -36,6 +39,12 @@ const ffmpegSettings = ref({
   ffmpeg_path: '/usr/bin/ffmpeg',
   buffer_size: 2048,
   idle_timeout: 60,
+  startup_analyzeduration_ms: 5000,
+  startup_probesize_kb: 5000,
+  input_timeout_seconds: 10,
+  reconnect_delay_max_seconds: 5,
+  no_data_timeout_seconds: 20,
+  watchdog_interval_seconds: 5,
   max_streams: 100,
   enable_hls: true,
   hls_segment_duration: 6
@@ -66,6 +75,11 @@ const profileForm = ref({
 const loading = ref(false)
 const saving = ref(false)
 
+const activeTab = ref<'system' | 'ffmpeg' | 'stream' | 'account'>('system')
+
+// Keep snapshots to detect changes (avoid unnecessary confirm prompts)
+const lastLoadedFFmpegSettingsJson = ref('')
+
 // Load settings
 const loadSettings = async () => {
   loading.value = true
@@ -82,6 +96,9 @@ const loadSettings = async () => {
       }
       if (res.data.ffmpeg) {
         Object.assign(ffmpegSettings.value, res.data.ffmpeg)
+
+        // Snapshot after applying backend values
+        lastLoadedFFmpegSettingsJson.value = JSON.stringify(ffmpegSettings.value)
       }
       if (res.data.stream) {
         Object.assign(streamSettings.value, res.data.stream)
@@ -123,6 +140,16 @@ const saveSystemSettings = async () => {
 const saveFFmpegSettings = async () => {
   saving.value = true
   try {
+    await ElMessageBox.confirm(
+      'Save FFmpeg settings now? Some options may only affect new streams unless you restart streams.',
+      'Confirm Save',
+      {
+        confirmButtonText: 'Save',
+        cancelButtonText: 'Cancel',
+        type: 'warning'
+      }
+    )
+
     await request.post({
       url: '/api/settings',
       data: {
@@ -130,8 +157,13 @@ const saveFFmpegSettings = async () => {
         settings: ffmpegSettings.value
       }
     })
+
+    // Update snapshot after successful save
+    lastLoadedFFmpegSettingsJson.value = JSON.stringify(ffmpegSettings.value)
     ElMessage.success('FFmpeg settings saved successfully')
   } catch (error) {
+    // Cancel click throws; keep it quiet.
+    if ((error as any)?.toString?.()?.includes('cancel')) return
     ElMessage.error('Failed to save FFmpeg settings')
   } finally {
     saving.value = false
@@ -177,6 +209,52 @@ const clearCache = async () => {
     ElMessage.success('Cache cleared successfully')
   } catch (error) {
     ElMessage.error('Failed to clear cache')
+  }
+}
+
+// Restart all active streams (apply FFmpeg/settings changes immediately)
+const restartStreams = async () => {
+  try {
+    await ElMessageBox.confirm(
+      'This will stop current FFmpeg sessions and restart streams that were active/in-use. Continue?',
+      'Restart Streams',
+      {
+        confirmButtonText: 'Restart',
+        cancelButtonText: 'Cancel',
+        type: 'warning'
+      }
+    )
+
+    ElMessage.info('Restarting streams...')
+    const res = await request.post({ url: '/api/settings/restart-streams' })
+    const stopped = res?.data?.stopped ?? 0
+    const restarted = res?.data?.restarted ?? 0
+    ElMessage.success(`Restart done. Stopped: ${stopped}, Restarted: ${restarted}`)
+  } catch (error) {
+    // Cancel click throws; keep it quiet.
+    if ((error as any)?.toString?.()?.includes('cancel')) return
+    ElMessage.error('Failed to restart streams')
+  }
+}
+
+const resetTotalBandwidth = async () => {
+  try {
+    await ElMessageBox.confirm(
+      'Reset Total Download/Upload counters? This will not stop currently running streams.',
+      'Confirm',
+      {
+        confirmButtonText: 'Reset',
+        cancelButtonText: 'Cancel',
+        type: 'warning'
+      }
+    )
+
+    await request.post({ url: '/api/settings/reset-bandwidth' })
+    ElMessage.success('Total bandwidth counters reset')
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('Failed to reset total bandwidth')
+    }
   }
 }
 
@@ -264,307 +342,438 @@ onMounted(() => {
 
 <template>
   <ContentWrap title="Settings" message="Configure system settings and preferences">
-    <ElRow :gutter="20">
-      <!-- System Settings -->
-      <ElCol :xs="24" :sm="24" :md="12">
-        <ElCard shadow="hover">
-          <template #header>
-            <div style="display: flex; align-items: center; gap: 8px">
-              <Icon icon="ep:setting" />
-              <span>System Settings</span>
-            </div>
-          </template>
-
-          <ElForm :model="systemSettings" label-width="200px" v-loading="loading">
-            <ElFormItem label="Server Name">
-              <ElInput v-model="systemSettings.server_name" placeholder="IPTV Panel" />
-            </ElFormItem>
-
-            <ElFormItem label="Server URL">
-              <ElInput v-model="systemSettings.server_url" placeholder="http://localhost:8080" />
-            </ElFormItem>
-
-            <ElFormItem label="Max Connections/User">
-              <ElInputNumber
-                v-model="systemSettings.max_connections_per_user"
-                :min="1"
-                :max="10"
-                style="width: 100%"
-              />
-            </ElFormItem>
-
-            <ElFormItem label="Session Timeout (seconds)">
-              <ElInputNumber
-                v-model="systemSettings.session_timeout"
-                :min="300"
-                :max="86400"
-                style="width: 100%"
-              />
-            </ElFormItem>
-
-            <ElFormItem label="User Registration">
-              <ElSwitch v-model="systemSettings.enable_user_registration" />
-            </ElFormItem>
-
-            <ElFormItem label="Relay Mode">
-              <ElSwitch v-model="systemSettings.enable_relay_mode" />
-            </ElFormItem>
-
-            <ElFormItem>
-              <ElButton type="primary" @click="saveSystemSettings" :loading="saving">
-                <Icon icon="ep:upload" />
-                Save System Settings
-              </ElButton>
-            </ElFormItem>
-          </ElForm>
-        </ElCard>
-      </ElCol>
-
-      <!-- FFmpeg Settings -->
-      <ElCol :xs="24" :sm="24" :md="12">
-        <ElCard shadow="hover">
-          <template #header>
-            <div style="display: flex; align-items: center; gap: 8px">
-              <Icon icon="ep:video-camera" />
-              <span>FFmpeg Settings</span>
-            </div>
-          </template>
-
-          <ElForm :model="ffmpegSettings" label-width="200px" v-loading="loading">
-            <ElFormItem label="FFmpeg Path">
-              <ElInput v-model="ffmpegSettings.ffmpeg_path" placeholder="/usr/bin/ffmpeg" />
-            </ElFormItem>
-
-            <ElFormItem label="Buffer Size (KB)">
-              <ElInputNumber
-                v-model="ffmpegSettings.buffer_size"
-                :min="512"
-                :max="10240"
-                style="width: 100%"
-              />
-            </ElFormItem>
-
-            <ElFormItem label="Idle Timeout (seconds)">
-              <ElInputNumber
-                v-model="ffmpegSettings.idle_timeout"
-                :min="30"
-                :max="300"
-                style="width: 100%"
-              />
-            </ElFormItem>
-
-            <ElFormItem label="Max Concurrent Streams">
-              <ElInputNumber
-                v-model="ffmpegSettings.max_streams"
-                :min="10"
-                :max="500"
-                style="width: 100%"
-              />
-            </ElFormItem>
-
-            <ElFormItem label="Enable HLS">
-              <ElSwitch v-model="ffmpegSettings.enable_hls" />
-            </ElFormItem>
-
-            <ElFormItem label="HLS Segment Duration (s)">
-              <ElInputNumber
-                v-model="ffmpegSettings.hls_segment_duration"
-                :min="2"
-                :max="10"
-                style="width: 100%"
-              />
-            </ElFormItem>
-
-            <ElFormItem>
-              <div style="display: flex; gap: 8px">
-                <ElButton type="primary" @click="saveFFmpegSettings" :loading="saving">
-                  <Icon icon="ep:upload" />
-                  Save FFmpeg Settings
-                </ElButton>
-                <ElButton @click="testFFmpeg">
-                  <Icon icon="ep:video-play" />
-                  Test FFmpeg
-                </ElButton>
-              </div>
-            </ElFormItem>
-          </ElForm>
-        </ElCard>
-      </ElCol>
-
-      <!-- Stream Settings -->
-      <ElCol :xs="24" :sm="24" :md="12" style="margin-top: 20px">
-        <ElCard shadow="hover">
-          <template #header>
-            <div style="display: flex; align-items: center; gap: 8px">
-              <Icon icon="ep:video-play" />
-              <span>Stream Settings</span>
-            </div>
-          </template>
-
-          <ElForm :model="streamSettings" label-width="200px" v-loading="loading">
-            <ElFormItem label="Auto Start Streams">
-              <ElSwitch v-model="streamSettings.auto_start" />
-            </ElFormItem>
-
-            <ElFormItem label="Auto Stop Idle Streams">
-              <ElSwitch v-model="streamSettings.auto_stop" />
-            </ElFormItem>
-
-            <ElFormItem label="Max Bitrate (kbps)">
-              <ElInputNumber
-                v-model="streamSettings.max_bitrate"
-                :min="1000"
-                :max="20000"
-                style="width: 100%"
-              />
-            </ElFormItem>
-
-            <ElFormItem label="Enable Transcode">
-              <ElSwitch v-model="streamSettings.enable_transcode" />
-            </ElFormItem>
-
-            <ElFormItem label="Default Format">
-              <ElInput v-model="streamSettings.default_format" placeholder="mpegts" />
-            </ElFormItem>
-
-            <ElFormItem>
-              <ElButton type="primary" @click="saveStreamSettings" :loading="saving">
-                <Icon icon="ep:upload" />
-                Save Stream Settings
-              </ElButton>
-            </ElFormItem>
-          </ElForm>
-        </ElCard>
-      </ElCol>
-
-      <!-- System Actions -->
-      <ElCol :xs="24" :sm="24" :md="12" style="margin-top: 20px">
-        <ElCard shadow="hover">
-          <template #header>
-            <div style="display: flex; align-items: center; gap: 8px">
-              <Icon icon="ep:tools" />
-              <span>System Actions</span>
-            </div>
-          </template>
-
-          <div style="padding: 20px">
-            <ElFormItem label="Cache Management">
-              <div style="display: flex; gap: 8px; align-items: center">
-                <ElButton @click="clearCache">
-                  <Icon icon="ep:delete" />
-                  Clear HLS Cache
-                </ElButton>
-                <span style="color: #909399; font-size: 12px"> Clear all cached HLS segments </span>
-              </div>
-            </ElFormItem>
-
-            <ElDivider />
-
-            <ElFormItem label="System Information">
-              <div style="display: flex; flex-direction: column; gap: 8px">
-                <div style="display: flex; justify-content: space-between">
-                  <span>Version:</span>
-                  <ElTag>v1.0.0</ElTag>
-                </div>
-                <div style="display: flex; justify-content: space-between">
-                  <span>Go Version:</span>
-                  <ElTag type="success">1.21+</ElTag>
-                </div>
-                <div style="display: flex; justify-content: space-between">
-                  <span>Database:</span>
-                  <ElTag type="info">SQLite</ElTag>
-                </div>
-                <div style="display: flex; justify-content: space-between">
-                  <span>FFmpeg:</span>
-                  <ElTag type="warning">Installed</ElTag>
-                </div>
-              </div>
-            </ElFormItem>
+    <ElTabs v-model="activeTab" type="border-card">
+      <ElTabPane name="system">
+        <template #label>
+          <div style="display: inline-flex; align-items: center; gap: 6px">
+            <Icon icon="ep:setting" />
+            <span>System</span>
           </div>
-        </ElCard>
-      </ElCol>
+        </template>
 
-      <!-- Account Settings - Change Password -->
-      <ElCol :xs="24" :sm="24" :md="12" style="margin-top: 20px">
-        <ElCard shadow="hover">
-          <template #header>
-            <div style="display: flex; align-items: center; gap: 8px">
-              <Icon icon="ep:lock" />
-              <span>Change Password</span>
-            </div>
-          </template>
+        <ElRow :gutter="20">
+          <ElCol :xs="24" :sm="24" :md="12">
+            <ElCard shadow="hover">
+              <template #header>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <Icon icon="ep:setting" />
+                  <span>System Settings</span>
+                </div>
+              </template>
 
-          <ElForm :model="accountForm" label-width="200px">
-            <ElFormItem label="Current Password">
-              <ElInput
-                v-model="accountForm.current_password"
-                type="password"
-                placeholder="Enter current password"
-                show-password
-              />
-            </ElFormItem>
+              <ElForm :model="systemSettings" label-width="200px" v-loading="loading">
+                <ElFormItem label="Server Name">
+                  <ElInput v-model="systemSettings.server_name" placeholder="IPTV Panel" />
+                </ElFormItem>
 
-            <ElFormItem label="New Password">
-              <ElInput
-                v-model="accountForm.new_password"
-                type="password"
-                placeholder="At least 6 characters"
-                show-password
-              />
-            </ElFormItem>
+                <ElFormItem label="Server URL">
+                  <ElInput
+                    v-model="systemSettings.server_url"
+                    placeholder="http://localhost:8080"
+                  />
+                </ElFormItem>
 
-            <ElFormItem label="Confirm Password">
-              <ElInput
-                v-model="accountForm.confirm_password"
-                type="password"
-                placeholder="Re-enter new password"
-                show-password
-              />
-            </ElFormItem>
+                <ElFormItem label="Max Connections/User">
+                  <ElInputNumber
+                    v-model="systemSettings.max_connections_per_user"
+                    :min="1"
+                    :max="10"
+                    style="width: 100%"
+                  />
+                </ElFormItem>
 
-            <ElFormItem>
-              <ElButton type="primary" @click="changePassword" :loading="saving">
-                <Icon icon="ep:check" />
-                Change Password
-              </ElButton>
-            </ElFormItem>
-          </ElForm>
-        </ElCard>
-      </ElCol>
+                <ElFormItem label="Session Timeout (seconds)">
+                  <ElInputNumber
+                    v-model="systemSettings.session_timeout"
+                    :min="300"
+                    :max="86400"
+                    style="width: 100%"
+                  />
+                </ElFormItem>
 
-      <!-- Account Settings - Profile -->
-      <ElCol :xs="24" :sm="24" :md="12" style="margin-top: 20px">
-        <ElCard shadow="hover">
-          <template #header>
-            <div style="display: flex; align-items: center; gap: 8px">
-              <Icon icon="ep:user" />
-              <span>Profile Settings</span>
-            </div>
-          </template>
+                <ElFormItem label="User Registration">
+                  <ElSwitch v-model="systemSettings.enable_user_registration" />
+                </ElFormItem>
 
-          <ElForm :model="profileForm" label-width="200px">
-            <ElFormItem label="Username">
-              <ElInput v-model="profileForm.username" placeholder="Admin username" disabled />
-            </ElFormItem>
+                <ElFormItem label="Relay Mode">
+                  <ElSwitch v-model="systemSettings.enable_relay_mode" />
+                </ElFormItem>
 
-            <ElFormItem label="Full Name">
-              <ElInput v-model="profileForm.full_name" placeholder="Your full name" />
-            </ElFormItem>
+                <ElFormItem>
+                  <ElButton type="primary" @click="saveSystemSettings" :loading="saving">
+                    <Icon icon="ep:upload" />
+                    Save System Settings
+                  </ElButton>
+                </ElFormItem>
+              </ElForm>
+            </ElCard>
+          </ElCol>
 
-            <ElFormItem label="Email">
-              <ElInput v-model="profileForm.email" placeholder="your.email@example.com" />
-            </ElFormItem>
+          <ElCol :xs="24" :sm="24" :md="12">
+            <ElCard shadow="hover">
+              <template #header>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <Icon icon="ep:tools" />
+                  <span>System Actions</span>
+                </div>
+              </template>
 
-            <ElFormItem>
-              <ElButton type="primary" @click="updateProfile" :loading="saving">
-                <Icon icon="ep:upload" />
-                Update Profile
-              </ElButton>
-            </ElFormItem>
-          </ElForm>
-        </ElCard>
-      </ElCol>
-    </ElRow>
+              <div style="padding: 20px">
+                <ElFormItem label="Cache Management">
+                  <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+                    <ElButton @click="clearCache">
+                      <Icon icon="ep:delete" />
+                      Clear HLS Cache
+                    </ElButton>
+                    <ElButton type="warning" @click="resetTotalBandwidth">
+                      <Icon icon="ep:refresh" />
+                      Reset Total Bandwidth
+                    </ElButton>
+                    <span style="color: #909399; font-size: 12px">
+                      Clear all cached HLS segments
+                    </span>
+                  </div>
+                </ElFormItem>
+
+                <ElDivider />
+
+                <ElFormItem label="System Information">
+                  <div style="display: flex; flex-direction: column; gap: 8px">
+                    <div style="display: flex; justify-content: space-between">
+                      <span>Version:</span>
+                      <ElTag>v1.0.0</ElTag>
+                    </div>
+                    <div style="display: flex; justify-content: space-between">
+                      <span>Go Version:</span>
+                      <ElTag type="success">1.21+</ElTag>
+                    </div>
+                    <div style="display: flex; justify-content: space-between">
+                      <span>Database:</span>
+                      <ElTag type="info">SQLite</ElTag>
+                    </div>
+                    <div style="display: flex; justify-content: space-between">
+                      <span>FFmpeg:</span>
+                      <ElTag type="warning">Installed</ElTag>
+                    </div>
+                  </div>
+                </ElFormItem>
+              </div>
+            </ElCard>
+          </ElCol>
+        </ElRow>
+      </ElTabPane>
+
+      <ElTabPane name="ffmpeg">
+        <template #label>
+          <div style="display: inline-flex; align-items: center; gap: 6px">
+            <Icon icon="ep:video-camera" />
+            <span>FFmpeg</span>
+          </div>
+        </template>
+
+        <ElRow :gutter="20">
+          <ElCol :xs="24" :sm="24" :md="16">
+            <ElCard shadow="hover">
+              <template #header>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <Icon icon="ep:video-camera" />
+                  <span>FFmpeg Settings</span>
+                </div>
+              </template>
+
+              <ElForm :model="ffmpegSettings" label-width="200px" v-loading="loading">
+                <ElFormItem label="FFmpeg Path">
+                  <ElInput v-model="ffmpegSettings.ffmpeg_path" placeholder="/usr/bin/ffmpeg" />
+                </ElFormItem>
+
+                <ElFormItem label="Buffer Size (KB)">
+                  <ElInputNumber
+                    v-model="ffmpegSettings.buffer_size"
+                    :min="512"
+                    :max="10240"
+                    style="width: 100%"
+                  />
+                </ElFormItem>
+
+                <ElFormItem label="Idle Timeout (seconds)">
+                  <ElInputNumber
+                    v-model="ffmpegSettings.idle_timeout"
+                    :min="30"
+                    :max="86400"
+                    style="width: 100%"
+                  />
+                </ElFormItem>
+
+                <ElDivider content-position="left">On-Demand Start Tuning</ElDivider>
+
+                <ElFormItem label="Analyze Duration (ms)">
+                  <div style="width: 100%">
+                    <ElInputNumber
+                      v-model="ffmpegSettings.startup_analyzeduration_ms"
+                      :min="100"
+                      :max="20000"
+                      style="width: 100%"
+                    />
+                    <div style="margin-top: 6px">
+                      <ElTag type="info" size="small">
+                        Lower = faster start, but may fail on some streams
+                      </ElTag>
+                    </div>
+                  </div>
+                </ElFormItem>
+
+                <ElFormItem label="Probe Size (KB)">
+                  <div style="width: 100%">
+                    <ElInputNumber
+                      v-model="ffmpegSettings.startup_probesize_kb"
+                      :min="256"
+                      :max="20000"
+                      style="width: 100%"
+                    />
+                    <div style="margin-top: 6px">
+                      <ElTag type="info" size="small">
+                        Lower = faster start, but may reduce detection accuracy
+                      </ElTag>
+                    </div>
+                  </div>
+                </ElFormItem>
+
+                <ElFormItem label="Input Timeout (seconds)">
+                  <ElInputNumber
+                    v-model="ffmpegSettings.input_timeout_seconds"
+                    :min="1"
+                    :max="60"
+                    style="width: 100%"
+                  />
+                </ElFormItem>
+
+                <ElFormItem label="Reconnect Delay Max (seconds)">
+                  <ElInputNumber
+                    v-model="ffmpegSettings.reconnect_delay_max_seconds"
+                    :min="1"
+                    :max="30"
+                    style="width: 100%"
+                  />
+                </ElFormItem>
+
+                <ElFormItem label="Upstream No-Data Timeout (seconds)">
+                  <div style="width: 100%">
+                    <ElInputNumber
+                      v-model="ffmpegSettings.no_data_timeout_seconds"
+                      :min="0"
+                      :max="600"
+                      style="width: 100%"
+                    />
+                    <div style="margin-top: 6px">
+                      <ElTag type="info" size="small">0 = disable watchdog</ElTag>
+                    </div>
+                  </div>
+                </ElFormItem>
+
+                <ElFormItem label="Watchdog Interval (seconds)">
+                  <ElInputNumber
+                    v-model="ffmpegSettings.watchdog_interval_seconds"
+                    :min="1"
+                    :max="60"
+                    style="width: 100%"
+                  />
+                </ElFormItem>
+
+                <ElFormItem label="Max Concurrent Streams">
+                  <ElInputNumber
+                    v-model="ffmpegSettings.max_streams"
+                    :min="10"
+                    :max="500"
+                    style="width: 100%"
+                  />
+                </ElFormItem>
+
+                <ElFormItem label="Enable HLS">
+                  <ElSwitch v-model="ffmpegSettings.enable_hls" />
+                </ElFormItem>
+
+                <ElFormItem label="HLS Segment Duration (s)">
+                  <ElInputNumber
+                    v-model="ffmpegSettings.hls_segment_duration"
+                    :min="2"
+                    :max="10"
+                    style="width: 100%"
+                  />
+                </ElFormItem>
+
+                <ElFormItem>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap; width: 100%">
+                    <ElButton
+                      type="primary"
+                      @click="saveFFmpegSettings"
+                      :loading="saving"
+                      style="flex: 0 0 auto"
+                    >
+                      <Icon icon="ep:upload" />
+                      Save FFmpeg Settings
+                    </ElButton>
+                    <ElButton @click="testFFmpeg" style="flex: 0 0 auto">
+                      <Icon icon="ep:video-play" />
+                      Test FFmpeg
+                    </ElButton>
+                    <ElButton type="warning" @click="restartStreams" style="flex: 0 0 auto">
+                      <Icon icon="ep:refresh" />
+                      Restart Streams
+                    </ElButton>
+                  </div>
+                </ElFormItem>
+              </ElForm>
+            </ElCard>
+          </ElCol>
+        </ElRow>
+      </ElTabPane>
+
+      <ElTabPane name="stream">
+        <template #label>
+          <div style="display: inline-flex; align-items: center; gap: 6px">
+            <Icon icon="ep:video-play" />
+            <span>Stream</span>
+          </div>
+        </template>
+
+        <ElRow :gutter="20">
+          <ElCol :xs="24" :sm="24" :md="12">
+            <ElCard shadow="hover">
+              <template #header>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <Icon icon="ep:video-play" />
+                  <span>Stream Settings</span>
+                </div>
+              </template>
+
+              <ElForm :model="streamSettings" label-width="200px" v-loading="loading">
+                <ElFormItem label="Auto Start Streams">
+                  <ElSwitch v-model="streamSettings.auto_start" />
+                </ElFormItem>
+
+                <ElFormItem label="Auto Stop Idle Streams">
+                  <ElSwitch v-model="streamSettings.auto_stop" />
+                </ElFormItem>
+
+                <ElFormItem label="Max Bitrate (kbps)">
+                  <ElInputNumber
+                    v-model="streamSettings.max_bitrate"
+                    :min="1000"
+                    :max="20000"
+                    style="width: 100%"
+                  />
+                </ElFormItem>
+
+                <ElFormItem label="Enable Transcode">
+                  <ElSwitch v-model="streamSettings.enable_transcode" />
+                </ElFormItem>
+
+                <ElFormItem label="Default Format">
+                  <ElInput v-model="streamSettings.default_format" placeholder="mpegts" />
+                </ElFormItem>
+
+                <ElFormItem>
+                  <ElButton type="primary" @click="saveStreamSettings" :loading="saving">
+                    <Icon icon="ep:upload" />
+                    Save Stream Settings
+                  </ElButton>
+                </ElFormItem>
+              </ElForm>
+            </ElCard>
+          </ElCol>
+        </ElRow>
+      </ElTabPane>
+
+      <ElTabPane name="account">
+        <template #label>
+          <div style="display: inline-flex; align-items: center; gap: 6px">
+            <Icon icon="ep:user" />
+            <span>Account</span>
+          </div>
+        </template>
+
+        <ElRow :gutter="20">
+          <ElCol :xs="24" :sm="24" :md="12">
+            <ElCard shadow="hover">
+              <template #header>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <Icon icon="ep:lock" />
+                  <span>Change Password</span>
+                </div>
+              </template>
+
+              <ElForm :model="accountForm" label-width="200px">
+                <ElFormItem label="Current Password">
+                  <ElInput
+                    v-model="accountForm.current_password"
+                    type="password"
+                    placeholder="Enter current password"
+                    show-password
+                  />
+                </ElFormItem>
+
+                <ElFormItem label="New Password">
+                  <ElInput
+                    v-model="accountForm.new_password"
+                    type="password"
+                    placeholder="At least 6 characters"
+                    show-password
+                  />
+                </ElFormItem>
+
+                <ElFormItem label="Confirm Password">
+                  <ElInput
+                    v-model="accountForm.confirm_password"
+                    type="password"
+                    placeholder="Re-enter new password"
+                    show-password
+                  />
+                </ElFormItem>
+
+                <ElFormItem>
+                  <ElButton type="primary" @click="changePassword" :loading="saving">
+                    <Icon icon="ep:check" />
+                    Change Password
+                  </ElButton>
+                </ElFormItem>
+              </ElForm>
+            </ElCard>
+          </ElCol>
+
+          <ElCol :xs="24" :sm="24" :md="12">
+            <ElCard shadow="hover">
+              <template #header>
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <Icon icon="ep:user" />
+                  <span>Profile Settings</span>
+                </div>
+              </template>
+
+              <ElForm :model="profileForm" label-width="200px">
+                <ElFormItem label="Username">
+                  <ElInput v-model="profileForm.username" placeholder="Admin username" disabled />
+                </ElFormItem>
+
+                <ElFormItem label="Full Name">
+                  <ElInput v-model="profileForm.full_name" placeholder="Your full name" />
+                </ElFormItem>
+
+                <ElFormItem label="Email">
+                  <ElInput v-model="profileForm.email" placeholder="your.email@example.com" />
+                </ElFormItem>
+
+                <ElFormItem>
+                  <ElButton type="primary" @click="updateProfile" :loading="saving">
+                    <Icon icon="ep:upload" />
+                    Update Profile
+                  </ElButton>
+                </ElFormItem>
+              </ElForm>
+            </ElCard>
+          </ElCol>
+        </ElRow>
+      </ElTabPane>
+    </ElTabs>
   </ContentWrap>
 </template>
 

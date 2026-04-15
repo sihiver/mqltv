@@ -1,9 +1,0 @@
-#EXTM3U
-#EXTINF:-1 tvg-id="19859" tvg-name="trans" tvg-logo="" group-title="Local",trans
-http://172.23.96.130:8080/stream/channel-19859/hls?username=nizam&password=81dc9bdb52d04dc20036dbd8313ed055
-#EXTINF:-1 tvg-id="19856" tvg-name="indosiar" tvg-logo="" group-title="local",indosiar
-http://172.23.96.130:8080/stream/channel-19856/hls?username=nizam&password=81dc9bdb52d04dc20036dbd8313ed055
-#EXTINF:-1 tvg-id="19857" tvg-name="cnn" tvg-logo="" group-title="news",cnn
-http://172.23.96.130:8080/stream/channel-19857/hls?username=nizam&password=81dc9bdb52d04dc20036dbd8313ed055
-#EXTINF:-1 tvg-id="19858" tvg-name="trans7" tvg-logo="" group-title="news",trans7
-http://172.23.96.130:8080/stream/channel-19858/hls?username=nizam&password=81dc9bdb52d04dc20036dbd8313ed055

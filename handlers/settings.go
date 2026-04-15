@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"iptv-panel/database"
+	"iptv-panel/streaming"
 	"log"
 	"net/http"
 	"os/exec"
@@ -148,5 +149,78 @@ func ClearHLSCache(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"code":    0,
 		"message": "HLS cache cleared successfully",
+	})
+}
+
+// RestartStreams stops all current FFmpeg sessions and recreates those that were running.
+// Useful after changing ffmpeg_path or other runtime streaming settings.
+func RestartStreams(w http.ResponseWriter, r *http.Request) {
+	manager := streaming.GetFFmpegManager()
+	sessions := manager.GetAllSessions()
+
+	type sessionSnapshot struct {
+		ID          string
+		SourceURLs  []string
+		Format      string
+		OnDemand    bool
+		WasActive   bool
+		ClientCount int
+	}
+
+	snapshots := make([]sessionSnapshot, 0, len(sessions))
+	for _, s := range sessions {
+		snapshots = append(snapshots, sessionSnapshot{
+			ID:          s.ID,
+			SourceURLs:  append([]string(nil), s.SourceURLs...),
+			Format:      s.OutputFormat,
+			OnDemand:    s.IsOnDemand(),
+			WasActive:   s.IsActive(),
+			ClientCount: s.GetClientCount(),
+		})
+	}
+
+	stopped := 0
+	for _, snap := range snapshots {
+		manager.DeleteSession(snap.ID)
+		stopped++
+	}
+
+	restarted := 0
+	for _, snap := range snapshots {
+		// Only restart streams that were effectively in-use:
+		// - had clients, or
+		// - on-demand disabled (meant to keep running), or
+		// - already active.
+		if snap.ClientCount == 0 && snap.OnDemand && !snap.WasActive {
+			continue
+		}
+
+		newSession := manager.GetOrCreateFFmpegSession(snap.ID, snap.SourceURLs, snap.Format)
+		newSession.SetOnDemand(snap.OnDemand)
+		go newSession.Start()
+		restarted++
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code": 0,
+		"data": map[string]interface{}{
+			"stopped":   stopped,
+			"restarted": restarted,
+		},
+		"message": "Streams restart triggered",
+	})
+}
+
+// ResetTotalBandwidth resets the persisted total upload/download counters.
+// Note: if streams are currently running, totals may start increasing again immediately.
+func ResetTotalBandwidth(w http.ResponseWriter, r *http.Request) {
+	manager := streaming.GetFFmpegManager()
+	manager.ResetPersistedTotals()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code":    0,
+		"message": "Total bandwidth counters reset",
 	})
 }

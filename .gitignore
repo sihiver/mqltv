@@ -19,3 +19,7 @@ openwrt-toolchain-*.tar.zst
 # OpenWrt build outputs
 iptv-panel-armv7
 iptv-panel-openwrt-*
+
+# Generated playlists (runtime artifacts)
+generated_playlists/
+static/playlists/

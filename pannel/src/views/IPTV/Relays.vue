@@ -16,13 +16,22 @@ import {
 import { ref, reactive, onMounted } from 'vue'
 import request from '@/axios'
 
-const relays = ref([])
+type RelayRow = {
+  id: number
+  name: string
+  source_urls: string
+  output_path: string
+  active: boolean
+}
+
+const relays = ref<RelayRow[]>([])
 const loading = ref(false)
 const showCreateDialog = ref(false)
 
 const relayForm = reactive({
   name: '',
-  source_url: ''
+  output_path: '',
+  source_urls_text: ''
 })
 
 const loadRelays = async () => {
@@ -41,24 +50,37 @@ const loadRelays = async () => {
 }
 
 const createRelay = async () => {
-  if (!relayForm.name || !relayForm.source_url) {
-    ElMessage.warning('Name and Source URL are required')
+  const urls = relayForm.source_urls_text
+    .split('\n')
+    .map((v) => v.trim())
+    .filter(Boolean)
+
+  if (!relayForm.output_path || urls.length === 0) {
+    ElMessage.warning('Output Path and Source URLs are required')
     return
   }
 
   try {
-    await request.post({ url: '/api/relays', data: relayForm })
+    await request.post({
+      url: '/api/relays',
+      data: {
+        name: relayForm.name,
+        output_path: relayForm.output_path,
+        source_urls: urls
+      }
+    })
     ElMessage.success('Relay created successfully')
     showCreateDialog.value = false
     relayForm.name = ''
-    relayForm.source_url = ''
+    relayForm.output_path = ''
+    relayForm.source_urls_text = ''
     loadRelays()
   } catch (error) {
     ElMessage.error('Failed to create relay')
   }
 }
 
-const deleteRelay = async (relay: any) => {
+const deleteRelay = async (relay: RelayRow) => {
   try {
     await ElMessageBox.confirm(`Delete relay "${relay.name}"?`, 'Confirm', {
       confirmButtonText: 'Delete',
@@ -76,10 +98,19 @@ const deleteRelay = async (relay: any) => {
   }
 }
 
-const copyRelayURL = (relay: any) => {
-  const url = `${window.location.origin}/relay/${relay.id}/playlist.m3u8`
+const copyRelayURL = (relay: RelayRow) => {
+  const url = `${window.location.origin}/stream/${relay.output_path}`
   navigator.clipboard.writeText(url)
   ElMessage.success('URL copied to clipboard')
+}
+
+const getSourcesCount = (relay: RelayRow) => {
+  try {
+    const arr = JSON.parse(relay.source_urls)
+    return Array.isArray(arr) ? arr.length : 0
+  } catch {
+    return 0
+  }
 }
 
 onMounted(() => {
@@ -99,7 +130,13 @@ onMounted(() => {
     <ElTable :data="relays" v-loading="loading" style="width: 100%">
       <ElTableColumn prop="name" label="Name" min-width="150" />
 
-      <ElTableColumn prop="source_url" label="Source URL" min-width="300" show-overflow-tooltip />
+      <ElTableColumn prop="output_path" label="Output Path" min-width="180" show-overflow-tooltip />
+
+      <ElTableColumn label="Sources" width="120">
+        <template #default="{ row }">
+          <ElTag type="info">{{ getSourcesCount(row) }}</ElTag>
+        </template>
+      </ElTableColumn>
 
       <ElTableColumn label="Status" width="120">
         <template #default="{ row }">
@@ -126,17 +163,20 @@ onMounted(() => {
     </ElTable>
 
     <!-- Create Dialog -->
-    <ElDialog v-model="showCreateDialog" title="Create New Relay" width="500px">
+    <ElDialog v-model="showCreateDialog" title="Create New Relay" width="560px">
       <ElForm :model="relayForm" label-width="120px">
         <ElFormItem label="Name">
           <ElInput v-model="relayForm.name" placeholder="Relay name" />
         </ElFormItem>
-        <ElFormItem label="Source URL">
+        <ElFormItem label="Output Path">
+          <ElInput v-model="relayForm.output_path" placeholder="channel-123" />
+        </ElFormItem>
+        <ElFormItem label="Source URLs">
           <ElInput
-            v-model="relayForm.source_url"
+            v-model="relayForm.source_urls_text"
             type="textarea"
             :rows="3"
-            placeholder="http://example.com/stream.m3u8"
+            placeholder="http://example.com/stream1.ts\nhttp://example.com/stream2.ts"
           />
         </ElFormItem>
       </ElForm>

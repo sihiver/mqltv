@@ -116,7 +116,7 @@ func createTables() error {
 
 	// Create default admin if not exists
 	createDefaultAdmin()
-	
+
 	// Create default settings
 	createDefaultSettings()
 
@@ -130,7 +130,7 @@ func createTables() error {
 func createDefaultAdmin() {
 	var count int
 	DB.QueryRow("SELECT COUNT(*) FROM admins").Scan(&count)
-	
+
 	if count == 0 {
 		// Default password: admin123 (MD5 hashed)
 		defaultPassword := "0192023a7bbd73250516f069df18b500" // MD5 of "admin123"
@@ -147,27 +147,39 @@ func createDefaultAdmin() {
 func createDefaultSettings() {
 	defaultSettings := map[string]map[string]string{
 		"system": {
-			"server_name":                "IPTV Panel",
-			"server_url":                 "http://localhost:8080",
-			"max_connections_per_user":   "3",
-			"session_timeout":            "3600",
-			"enable_user_registration":   "false",
-			"enable_relay_mode":          "true",
+			"server_name":              "IPTV Panel",
+			"server_url":               "http://localhost:8080",
+			"max_connections_per_user": "3",
+			"session_timeout":          "3600",
+			"enable_user_registration": "false",
+			"enable_relay_mode":        "true",
 		},
 		"ffmpeg": {
-			"ffmpeg_path":            "/usr/bin/ffmpeg",
-			"buffer_size":            "2048",
-			"idle_timeout":           "60",
-			"max_streams":            "100",
-			"enable_hls":             "true",
-			"hls_segment_duration":   "6",
+			"ffmpeg_path":                 "/usr/bin/ffmpeg",
+			"buffer_size":                 "2048",
+			"idle_timeout":                "60",
+			"startup_analyzeduration_ms":  "5000",
+			"startup_probesize_kb":        "5000",
+			"input_timeout_seconds":       "10",
+			"reconnect_delay_max_seconds": "5",
+			"no_data_timeout_seconds":     "20",
+			"watchdog_interval_seconds":   "5",
+			"max_streams":                 "100",
+			"enable_hls":                  "true",
+			"hls_segment_duration":        "6",
 		},
 		"stream": {
-			"auto_start":         "true",
-			"auto_stop":          "true",
-			"max_bitrate":        "8000",
-			"enable_transcode":   "false",
-			"default_format":     "mpegts",
+			"auto_start":       "true",
+			"auto_stop":        "true",
+			"max_bitrate":      "8000",
+			"enable_transcode": "false",
+			"default_format":   "mpegts",
+		},
+		// Cumulative counters for dashboard. Stored in DB so totals don't reset to 0
+		// just because all streams are currently stopped.
+		"stats": {
+			"stats_total_bytes_read":  "0",
+			"stats_total_bytes_write": "0",
 		},
 	}
 
@@ -188,7 +200,7 @@ func runMigrations() {
 	err := DB.QueryRow(`
 		SELECT COUNT(*) FROM pragma_table_info('channels') WHERE name='on_demand'
 	`).Scan(&columnExists)
-	
+
 	if err == nil && columnExists == 0 {
 		_, err = DB.Exec("ALTER TABLE channels ADD COLUMN on_demand INTEGER DEFAULT 1")
 		if err == nil {

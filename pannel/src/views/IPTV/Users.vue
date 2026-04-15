@@ -23,6 +23,7 @@ const users = ref<any[]>([])
 const loading = ref(false)
 const showCreateDialog = ref(false)
 const showExtendDialog = ref(false)
+const showExpiryDialog = ref(false)
 const selectedUser = ref<any>(null)
 
 const userForm = reactive({
@@ -33,6 +34,10 @@ const userForm = reactive({
 
 const extendForm = reactive({
   days: 30
+})
+
+const expiryForm = reactive<{ expiresAt: Date }>({
+  expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000)
 })
 
 const loadUsers = async () => {
@@ -108,6 +113,92 @@ const openExtendDialog = (user: any) => {
   selectedUser.value = user
   extendForm.days = 30
   showExtendDialog.value = true
+}
+
+const openExpiryDialog = (user: any) => {
+  selectedUser.value = user
+
+  // Default: if user has expiry, prefill it; otherwise set to yesterday (expired)
+  if (user?.expires_at) {
+    const parsed = new Date(user.expires_at)
+    expiryForm.expiresAt = isNaN(parsed.getTime())
+      ? new Date(Date.now() - 24 * 60 * 60 * 1000)
+      : parsed
+  } else {
+    expiryForm.expiresAt = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  }
+
+  showExpiryDialog.value = true
+}
+
+const setExpiredNow = async (user: any) => {
+  try {
+    await ElMessageBox.confirm(`Set user "${user.username}" as expired now?`, 'Confirm', {
+      confirmButtonText: 'Set Expired',
+      cancelButtonText: 'Cancel',
+      type: 'warning'
+    })
+
+    // Set to 1 minute ago to guarantee expired
+    const expiresAt = new Date(Date.now() - 60 * 1000)
+    await request.post({
+      url: `/api/users/${user.id}/set-expired`,
+      data: { expires_at: expiresAt.toISOString() }
+    })
+
+    ElMessage.success('User marked as expired')
+    loadUsers()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('Failed to set expired')
+    }
+  }
+}
+
+const saveExpiry = async () => {
+  if (!selectedUser.value) return
+
+  try {
+    await request.post({
+      url: `/api/users/${selectedUser.value.id}/set-expired`,
+      data: { expires_at: expiryForm.expiresAt.toISOString() }
+    })
+
+    ElMessage.success('Expiry updated')
+    showExpiryDialog.value = false
+    loadUsers()
+  } catch (error) {
+    ElMessage.error('Failed to update expiry')
+  }
+}
+
+const clearExpiryForUser = async (user: any, closeDialog = false) => {
+  try {
+    await ElMessageBox.confirm(
+      `Clear expiry for user "${user.username}" (set unlimited)?`,
+      'Confirm',
+      {
+        confirmButtonText: 'Clear Expiry',
+        cancelButtonText: 'Cancel',
+        type: 'warning'
+      }
+    )
+
+    await request.post({
+      url: `/api/users/${user.id}/set-expired`,
+      data: { clear: true }
+    })
+
+    ElMessage.success('Expiry cleared (unlimited)')
+    if (closeDialog) {
+      showExpiryDialog.value = false
+    }
+    loadUsers()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('Failed to clear expiry')
+    }
+  }
 }
 
 const extendSubscription = async () => {
@@ -226,13 +317,31 @@ onMounted(() => {
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="Actions" width="300" fixed="right">
+      <ElTableColumn label="Actions" width="520" fixed="right">
         <template #default="{ row }">
           <ElButton type="primary" size="small" text @click="openExtendDialog(row)">
             <template #icon>
               <Icon icon="ep:calendar" />
             </template>
             Extend
+          </ElButton>
+          <ElButton type="info" size="small" text @click="openExpiryDialog(row)">
+            <template #icon>
+              <Icon icon="ep:date" />
+            </template>
+            Set Expiry
+          </ElButton>
+          <ElButton type="warning" size="small" text @click="clearExpiryForUser(row)">
+            <template #icon>
+              <Icon icon="ep:refresh" />
+            </template>
+            Clear Expiry
+          </ElButton>
+          <ElButton type="danger" size="small" text @click="setExpiredNow(row)">
+            <template #icon>
+              <Icon icon="ep:warning" />
+            </template>
+            Set Expired
           </ElButton>
           <ElButton
             :type="row.disabled ? 'success' : 'warning'"
@@ -298,6 +407,30 @@ onMounted(() => {
       <template #footer>
         <ElButton @click="showExtendDialog = false">Cancel</ElButton>
         <ElButton type="primary" @click="extendSubscription">Extend</ElButton>
+      </template>
+    </ElDialog>
+
+    <!-- Set Expiry Dialog -->
+    <ElDialog v-model="showExpiryDialog" title="Set Expiry" width="450px">
+      <ElForm :model="expiryForm" label-width="140px">
+        <ElFormItem label="Expires At">
+          <ElDatePicker
+            v-model="expiryForm.expiresAt"
+            type="datetime"
+            placeholder="Select expiry date/time"
+            style="width: 100%"
+          />
+          <div style="font-size: 12px; color: #909399; margin-top: 4px">
+            Choose a past date/time to mark user as expired.
+          </div>
+        </ElFormItem>
+      </ElForm>
+      <template #footer>
+        <ElButton @click="showExpiryDialog = false">Cancel</ElButton>
+        <ElButton type="warning" @click="selectedUser && clearExpiryForUser(selectedUser, true)">
+          Clear Expiry
+        </ElButton>
+        <ElButton type="primary" @click="saveExpiry">Save</ElButton>
       </template>
     </ElDialog>
   </ContentWrap>

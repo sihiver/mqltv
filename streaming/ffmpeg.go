@@ -2,19 +2,175 @@ package streaming
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"iptv-panel/database"
 	"log"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
+
+func getFFmpegSettingInt(key string, defaultValue int) int {
+	if database.DB == nil {
+		return defaultValue
+	}
+
+	var value string
+	err := database.DB.QueryRow(
+		"SELECT value FROM settings WHERE key = ? AND category = 'ffmpeg'",
+		key,
+	).Scan(&value)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return defaultValue
+		}
+		return defaultValue
+	}
+
+	n, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return defaultValue
+	}
+	return n
+}
+
+func getStatsSettingUint64(key string, defaultValue uint64) uint64 {
+	if database.DB == nil {
+		return defaultValue
+	}
+
+	var value string
+	err := database.DB.QueryRow(
+		"SELECT value FROM settings WHERE key = ? AND category = 'stats'",
+		key,
+	).Scan(&value)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return defaultValue
+		}
+		return defaultValue
+	}
+
+	n, err := strconv.ParseUint(strings.TrimSpace(value), 10, 64)
+	if err != nil {
+		return defaultValue
+	}
+	return n
+}
+
+func setStatsSettingUint64(key string, value uint64) {
+	if database.DB == nil {
+		return
+	}
+
+	// Best-effort upsert.
+	_, _ = database.DB.Exec(
+		`INSERT INTO settings (key, value, category)
+		 VALUES (?, ?, 'stats')
+		 ON CONFLICT(key) DO UPDATE SET value = excluded.value, category = 'stats', updated_at = CURRENT_TIMESTAMP`,
+		key, strconv.FormatUint(value, 10),
+	)
+}
+
+func getFFmpegExecutable() string {
+	if database.DB == nil {
+		return "ffmpeg"
+	}
+	var ffmpegPath string
+	err := database.DB.QueryRow(
+		"SELECT value FROM settings WHERE key = 'ffmpeg_path' AND category = 'ffmpeg'",
+	).Scan(&ffmpegPath)
+	if err != nil {
+		return "ffmpeg"
+	}
+	ffmpegPath = strings.TrimSpace(ffmpegPath)
+	if ffmpegPath == "" {
+		return "ffmpeg"
+	}
+	return ffmpegPath
+}
+
+func getFFmpegWatchdogConfig() (noDataTimeout time.Duration, interval time.Duration) {
+	noDataTimeoutSeconds := getFFmpegSettingInt("no_data_timeout_seconds", 20)
+	watchdogIntervalSeconds := getFFmpegSettingInt("watchdog_interval_seconds", 5)
+
+	// Allow disabling watchdog entirely with 0.
+	if noDataTimeoutSeconds < 0 {
+		noDataTimeoutSeconds = 20
+	}
+	if noDataTimeoutSeconds > 600 {
+		noDataTimeoutSeconds = 600
+	}
+
+	if watchdogIntervalSeconds < 1 {
+		watchdogIntervalSeconds = 1
+	}
+	if watchdogIntervalSeconds > 60 {
+		watchdogIntervalSeconds = 60
+	}
+
+	return time.Duration(noDataTimeoutSeconds) * time.Second, time.Duration(watchdogIntervalSeconds) * time.Second
+}
+
+func getFFmpegIdleTimeout() time.Duration {
+	idleSeconds := getFFmpegSettingInt("idle_timeout", 60)
+	if idleSeconds < 5 {
+		idleSeconds = 5
+	}
+	if idleSeconds > 86400 {
+		idleSeconds = 86400
+	}
+	return time.Duration(idleSeconds) * time.Second
+}
+
+func getFFmpegStartupProbeConfig() (reconnectDelayMaxSeconds int, timeoutMicros int, analyzeMicros int, probeBytes int) {
+	reconnectDelayMaxSeconds = getFFmpegSettingInt("reconnect_delay_max_seconds", 5)
+	if reconnectDelayMaxSeconds < 1 {
+		reconnectDelayMaxSeconds = 1
+	}
+	if reconnectDelayMaxSeconds > 30 {
+		reconnectDelayMaxSeconds = 30
+	}
+
+	inputTimeoutSeconds := getFFmpegSettingInt("input_timeout_seconds", 10)
+	if inputTimeoutSeconds < 1 {
+		inputTimeoutSeconds = 1
+	}
+	if inputTimeoutSeconds > 60 {
+		inputTimeoutSeconds = 60
+	}
+	timeoutMicros = inputTimeoutSeconds * 1000 * 1000
+
+	analyzeMs := getFFmpegSettingInt("startup_analyzeduration_ms", 5000)
+	if analyzeMs < 100 {
+		analyzeMs = 100
+	}
+	if analyzeMs > 20000 {
+		analyzeMs = 20000
+	}
+	analyzeMicros = analyzeMs * 1000
+
+	probeKB := getFFmpegSettingInt("startup_probesize_kb", 5000)
+	if probeKB < 256 {
+		probeKB = 256
+	}
+	if probeKB > 20000 {
+		probeKB = 20000
+	}
+	probeBytes = probeKB * 1024
+
+	return reconnectDelayMaxSeconds, timeoutMicros, analyzeMicros, probeBytes
+}
 
 // FFmpegSession manages FFmpeg-based streaming
 type FFmpegSession struct {
 	ID            string
 	SourceURLs    []string
 	OutputFormat  string // "mpegts", "hls", "copy"
+	owner         *FFmpegManager
 	onDemand      bool
 	onDemandMux   sync.RWMutex
 	ctx           context.Context
@@ -26,6 +182,8 @@ type FFmpegSession struct {
 	activeMux     sync.RWMutex
 	lastActivity  time.Time
 	startTime     time.Time
+	lastDataTime  time.Time
+	dataTimeMux   sync.RWMutex
 	pipeWriter    *StreamPipe
 	bytesRead     uint64 // Total bytes from source
 	bytesWritten  uint64 // Total bytes to clients
@@ -33,18 +191,18 @@ type FFmpegSession struct {
 	retryCount    int       // Number of consecutive failures
 	lastFailTime  time.Time // Last time FFmpeg failed
 	isBlacklisted bool      // If true, stop trying to restart
-	
+
 	// Real-time bandwidth tracking with sliding window
-	lastBytesRead     uint64
-	lastBytesWritten  uint64
-	lastStatsTime     time.Time
+	lastBytesRead       uint64
+	lastBytesWritten    uint64
+	lastStatsTime       time.Time
 	currentDownloadMbps float64
 	currentUploadMbps   float64
 	smoothingFactor     float64
-	
+
 	// Sliding window for stable average
-	bytesHistory      []uint64  // History of bytes read
-	bytesWriteHistory []uint64  // History of bytes written
+	bytesHistory      []uint64 // History of bytes read
+	bytesWriteHistory []uint64 // History of bytes written
 	timeHistory       []time.Time
 }
 
@@ -60,6 +218,12 @@ type FFmpegManager struct {
 	sessions    map[string]*FFmpegSession
 	sessionsMux sync.RWMutex
 	idleTimeout time.Duration
+
+	// Persisted totals across sessions (so dashboard totals don't drop to 0
+	// when all streams are currently stopped).
+	totalsMux           sync.Mutex
+	persistedBytesRead  uint64
+	persistedBytesWrite uint64
 }
 
 var (
@@ -74,9 +238,43 @@ func GetFFmpegManager() *FFmpegManager {
 			sessions:    make(map[string]*FFmpegSession),
 			idleTimeout: 60 * time.Second,
 		}
+		ffmpegManager.persistedBytesRead = getStatsSettingUint64("stats_total_bytes_read", 0)
+		ffmpegManager.persistedBytesWrite = getStatsSettingUint64("stats_total_bytes_write", 0)
 		go ffmpegManager.monitorSessions()
 	})
 	return ffmpegManager
+}
+
+func (m *FFmpegManager) addPersistedTotals(bytesRead, bytesWrite uint64) {
+	if bytesRead == 0 && bytesWrite == 0 {
+		return
+	}
+
+	m.totalsMux.Lock()
+	m.persistedBytesRead += bytesRead
+	m.persistedBytesWrite += bytesWrite
+	newRead := m.persistedBytesRead
+	newWrite := m.persistedBytesWrite
+	m.totalsMux.Unlock()
+
+	setStatsSettingUint64("stats_total_bytes_read", newRead)
+	setStatsSettingUint64("stats_total_bytes_write", newWrite)
+}
+
+func (m *FFmpegManager) GetPersistedTotals() (bytesRead uint64, bytesWrite uint64) {
+	m.totalsMux.Lock()
+	defer m.totalsMux.Unlock()
+	return m.persistedBytesRead, m.persistedBytesWrite
+}
+
+func (m *FFmpegManager) ResetPersistedTotals() {
+	m.totalsMux.Lock()
+	m.persistedBytesRead = 0
+	m.persistedBytesWrite = 0
+	m.totalsMux.Unlock()
+
+	setStatsSettingUint64("stats_total_bytes_read", 0)
+	setStatsSettingUint64("stats_total_bytes_write", 0)
 }
 
 // GetOrCreateFFmpegSession gets or creates FFmpeg session
@@ -92,20 +290,21 @@ func (m *FFmpegManager) GetOrCreateFFmpegSession(streamID string, sourceURLs []s
 	ctx, cancel := context.WithCancel(context.Background())
 	now := time.Now()
 	session := &FFmpegSession{
-		ID:           streamID,
-		SourceURLs:   sourceURLs,
-		OutputFormat: format,
-		onDemand:     true,
-		ctx:          ctx,
-		cancel:       cancel,
-		clients:      make(map[string]*StreamClient),
-		lastActivity: now,
-		startTime:    now,
-		lastStatsTime: now,
-		smoothingFactor: 0.6,
-		bytesHistory:     make([]uint64, 0, 10),
+		ID:                streamID,
+		SourceURLs:        sourceURLs,
+		OutputFormat:      format,
+		owner:             m,
+		onDemand:          true,
+		ctx:               ctx,
+		cancel:            cancel,
+		clients:           make(map[string]*StreamClient),
+		lastActivity:      now,
+		startTime:         now,
+		lastStatsTime:     now,
+		smoothingFactor:   0.6,
+		bytesHistory:      make([]uint64, 0, 10),
 		bytesWriteHistory: make([]uint64, 0, 10),
-		timeHistory:      make([]time.Time, 0, 10),
+		timeHistory:       make([]time.Time, 0, 10),
 		pipeWriter: &StreamPipe{
 			readers: make(map[string]chan []byte),
 			buffer:  NewRingBuffer(5 * 1024 * 1024), // 5MB buffer
@@ -116,6 +315,28 @@ func (m *FFmpegManager) GetOrCreateFFmpegSession(streamID string, sourceURLs []s
 	log.Printf("🎬 Created FFmpeg session: %s (format: %s)", streamID, format)
 
 	return session
+}
+
+// DeleteSession stops and removes a session from the manager.
+// Safe to call from any goroutine.
+func (m *FFmpegManager) DeleteSession(streamID string) {
+	m.sessionsMux.Lock()
+	session, ok := m.sessions[streamID]
+	if ok {
+		delete(m.sessions, streamID)
+	}
+	m.sessionsMux.Unlock()
+
+	if ok {
+		// Capture counters before stopping.
+		session.bytesMux.RLock()
+		read := session.bytesRead
+		written := session.bytesWritten
+		session.bytesMux.RUnlock()
+		m.addPersistedTotals(read, written)
+
+		session.Stop()
+	}
 }
 
 // SetOnDemand configures whether this session should auto-stop when idle.
@@ -140,12 +361,12 @@ func (s *FFmpegSession) AddClient(clientID, remoteAddr string) (chan []byte, err
 	if s.isBlacklisted {
 		return nil, fmt.Errorf("channel is offline or unavailable")
 	}
-	
+
 	s.clientsMux.Lock()
 	defer s.clientsMux.Unlock()
 
 	dataChan := make(chan []byte, 2000) // Large buffer to prevent packet drops
-	
+
 	s.pipeWriter.readersMux.Lock()
 	s.pipeWriter.readers[clientID] = dataChan
 	s.pipeWriter.readersMux.Unlock()
@@ -176,14 +397,14 @@ func (s *FFmpegSession) RemoveClient(clientID string) {
 
 	if _, exists := s.clients[clientID]; exists {
 		delete(s.clients, clientID)
-		
+
 		s.pipeWriter.readersMux.Lock()
 		if ch, ok := s.pipeWriter.readers[clientID]; ok {
 			close(ch)
 			delete(s.pipeWriter.readers, clientID)
 		}
 		s.pipeWriter.readersMux.Unlock()
-		
+
 		log.Printf("👋 Client disconnected from FFmpeg stream %s: %s (remaining: %d)", s.ID, clientID, len(s.clients))
 	}
 
@@ -213,6 +434,9 @@ func (s *FFmpegSession) Start() {
 	}
 	s.isActive = true
 	s.startTime = time.Now() // Set start time here
+	s.dataTimeMux.Lock()
+	s.lastDataTime = s.startTime
+	s.dataTimeMux.Unlock()
 	s.activeMux.Unlock()
 
 	log.Printf("▶️  Starting FFmpeg stream: %s", s.ID)
@@ -233,22 +457,25 @@ func (s *FFmpegSession) Start() {
 
 // startFFmpeg starts FFmpeg process
 func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
+	_, watchdogInterval := getFFmpegWatchdogConfig()
+	reconnectDelayMaxSeconds, timeoutMicros, analyzeMicros, probeBytes := getFFmpegStartupProbeConfig()
+
 	// Build FFmpeg command optimized for multiple concurrent streams
 	args := []string{
-		"-threads", "1",               // Limit to 1 thread per stream
-		"-reconnect", "1",             // Enable auto reconnect
-		"-reconnect_streamed", "1",    // Reconnect for streamed protocols
-		"-reconnect_delay_max", "5",   // Max 5 seconds between reconnects
-		"-timeout", "10000000",        // 10 second timeout (in microseconds)
-		"-fflags", "+genpts",          // Generate PTS (avoid dropping video on sources that mark packets corrupt)
-		"-flags", "low_delay",         // Low delay flag
-		"-analyzeduration", "5000000", // 5 seconds analysis (detect all streams)
-		"-probesize", "5000000",       // 5MB probe (ensure video detected)
-		"-i", sourceURL,               // Input URL
-		"-map", "0:v?",                // Map video stream (optional, won't fail if missing)
-		"-map", "0:a?",                // Map audio stream (optional, won't fail if missing)
-		"-c", "copy",                  // Copy codec (no transcoding)
-		"-f", "mpegts",                // Output format MPEG-TS
+		"-threads", "1", // Limit to 1 thread per stream
+		"-reconnect", "1", // Enable auto reconnect
+		"-reconnect_streamed", "1", // Reconnect for streamed protocols
+		"-reconnect_delay_max", strconv.Itoa(reconnectDelayMaxSeconds), // Max seconds between reconnects
+		"-timeout", strconv.Itoa(timeoutMicros), // Input timeout (microseconds)
+		"-fflags", "+genpts+discardcorrupt", // Generate PTS + discard corrupt packets
+		"-flags", "low_delay", // Low delay flag
+		"-analyzeduration", strconv.Itoa(analyzeMicros), // Analysis duration (microseconds)
+		"-probesize", strconv.Itoa(probeBytes), // Probe size (bytes)
+		"-i", sourceURL, // Input URL
+		"-map", "0:v?", // Map video stream (optional, won't fail if missing)
+		"-map", "0:a?", // Map audio stream (optional, won't fail if missing)
+		"-c", "copy", // Copy codec (no transcoding)
+		"-f", "mpegts", // Output format MPEG-TS
 		"-avoid_negative_ts", "make_zero", // Avoid timestamp issues
 		"-max_muxing_queue_size", "9999", // Large muxing queue for stability
 		"-mpegts_flags", "+resend_headers", // Re-send PAT/PMT and codec headers regularly (fixes audio-only on some sources)
@@ -256,7 +483,11 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-muxpreload", "0",
 		"-flush_packets", "1",
 		"-bsf:v", "h264_mp4toannexb,dump_extra", // H264 conversion + dump extra data (SPS/PPS)
-		"pipe:1",                      // Output to stdout
+		"-async", "1", // Audio sync method (resample)
+		"-vsync", "cfr", // Video sync constant frame rate
+		"-start_at_zero", // Start timestamps at zero
+		"-copytb", "1",   // Copy input timebase
+		"pipe:1", // Output to stdout
 	}
 
 	// If HLS output is requested
@@ -265,15 +496,15 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			"-threads", "1",
 			"-reconnect", "1",
 			"-reconnect_streamed", "1",
-			"-reconnect_delay_max", "5",
-			"-timeout", "10000000",
-			"-fflags", "+genpts",
+			"-reconnect_delay_max", strconv.Itoa(reconnectDelayMaxSeconds),
+			"-timeout", strconv.Itoa(timeoutMicros),
+			"-fflags", "+genpts+discardcorrupt",
 			"-flags", "low_delay",
-			"-analyzeduration", "5000000", // 5 seconds analysis
-			"-probesize", "5000000",       // 5MB probe
+			"-analyzeduration", strconv.Itoa(analyzeMicros),
+			"-probesize", strconv.Itoa(probeBytes),
 			"-i", sourceURL,
-			"-map", "0:v?",                // Map video (optional)
-			"-map", "0:a?",                // Map audio (optional)
+			"-map", "0:v?", // Map video (optional)
+			"-map", "0:a?", // Map audio (optional)
 			"-c", "copy",
 			"-f", "mpegts",
 			"-avoid_negative_ts", "make_zero",
@@ -287,8 +518,9 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		}
 	}
 
-	s.cmd = exec.CommandContext(s.ctx, "ffmpeg", args...)
-	
+	ffmpegExe := getFFmpegExecutable()
+	s.cmd = exec.CommandContext(s.ctx, ffmpegExe, args...)
+
 	stdout, err := s.cmd.StdoutPipe()
 	if err != nil {
 		log.Printf("❌ Failed to create stdout pipe: %v", err)
@@ -308,6 +540,46 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 
 	log.Printf("✅ FFmpeg started for source: %s", sourceURL)
 
+	// Watchdog: if FFmpeg produces no output for a while (upstream stalled/down),
+	// stop & remove the session so it can be recreated when upstream is back.
+	// This re-reads settings periodically so updates apply without server restart.
+	go func() {
+		timer := time.NewTimer(watchdogInterval)
+		defer timer.Stop()
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-timer.C:
+				if !s.IsActive() {
+					return
+				}
+
+				currentNoDataTimeout, currentInterval := getFFmpegWatchdogConfig()
+				// Schedule next tick using latest interval.
+				timer.Reset(currentInterval)
+
+				// If disabled, just keep looping.
+				if currentNoDataTimeout <= 0 {
+					continue
+				}
+
+				s.dataTimeMux.RLock()
+				last := s.lastDataTime
+				s.dataTimeMux.RUnlock()
+				if !last.IsZero() && time.Since(last) > currentNoDataTimeout {
+					log.Printf("⚠️  No stream data for %v (upstream likely down). Stopping restream: %s", currentNoDataTimeout, s.ID)
+					if s.owner != nil {
+						s.owner.DeleteSession(s.ID)
+					} else {
+						s.Stop()
+					}
+					return
+				}
+			}
+		}
+	}()
+
 	// Read FFmpeg stderr in background (for logging errors)
 	go func() {
 		buf := make([]byte, 4096)
@@ -316,8 +588,8 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			if n > 0 {
 				errMsg := string(buf[:n])
 				// Log FFmpeg errors/warnings
-				if strings.Contains(errMsg, "error") || strings.Contains(errMsg, "Error") || 
-				   strings.Contains(errMsg, "Invalid") || strings.Contains(errMsg, "failed") {
+				if strings.Contains(errMsg, "error") || strings.Contains(errMsg, "Error") ||
+					strings.Contains(errMsg, "Invalid") || strings.Contains(errMsg, "failed") {
 					log.Printf("🔴 FFmpeg error for %s: %s", s.ID, errMsg)
 				}
 			}
@@ -351,8 +623,12 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 					}
 					return
 				}
-				
+
 				if n > 0 {
+					s.dataTimeMux.Lock()
+					s.lastDataTime = time.Now()
+					s.dataTimeMux.Unlock()
+
 					data := make([]byte, n)
 					copy(data, buffer[:n])
 
@@ -392,12 +668,12 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 	// Wait for FFmpeg to finish and handle restart
 	go func() {
 		s.cmd.Wait()
-		
+
 		// Check if we still have clients
 		s.clientsMux.RLock()
 		hasClients := len(s.clients) > 0
 		s.clientsMux.RUnlock()
-		
+
 		// If we should keep the stream running (clients exist OR on-demand disabled)
 		// and context not cancelled, try to restart.
 		select {
@@ -409,7 +685,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			if keepRunning {
 				// Check if stream is running for less than 30 seconds (likely offline/bad stream)
 				runDuration := time.Since(s.startTime)
-				
+
 				// Increment retry count if failed quickly (< 30 seconds)
 				if runDuration < 30*time.Second {
 					s.retryCount++
@@ -419,29 +695,28 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 					// Reset retry count if stream ran successfully for > 30 seconds
 					s.retryCount = 0
 				}
-				
+
 				// Blacklist if failed 2 times in a row
 				if s.retryCount >= 2 {
 					s.isBlacklisted = true
-					log.Printf("🚫 Channel %s blacklisted after %d consecutive failures. Source likely offline.", s.ID, s.retryCount)
-					
-					// Disconnect all clients
-					s.clientsMux.Lock()
-					for clientID := range s.clients {
-						delete(s.clients, clientID)
+					log.Printf("🚫 Channel %s offline after %d consecutive failures; stopping restream.", s.ID, s.retryCount)
+
+					// Stop & remove the session so it can be recreated later when upstream is back.
+					if s.owner != nil {
+						s.owner.DeleteSession(s.ID)
+					} else {
+						s.Stop()
 					}
-					s.clientsMux.Unlock()
-					
 					return
 				}
-				
+
 				time.Sleep(2 * time.Second)
-				
+
 				// Mark as inactive and try to restart
 				s.activeMux.Lock()
 				s.isActive = false
 				s.activeMux.Unlock()
-				
+
 				// Restart if should keep running and not blacklisted.
 				s.clientsMux.RLock()
 				stillHasClients := len(s.clients) > 0
@@ -454,7 +729,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 				log.Printf("⏹️  FFmpeg stopped (no clients): %s", s.ID)
 			}
 		}
-		
+
 		s.activeMux.Lock()
 		s.isActive = false
 		s.activeMux.Unlock()
@@ -466,9 +741,9 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 // Stop stops FFmpeg session
 func (s *FFmpegSession) Stop() {
 	log.Printf("🛑 Stopping FFmpeg stream: %s", s.ID)
-	
+
 	s.cancel()
-	
+
 	if s.cmd != nil && s.cmd.Process != nil {
 		s.cmd.Process.Kill()
 	}
@@ -492,22 +767,31 @@ func (m *FFmpegManager) monitorSessions() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		m.sessionsMux.Lock()
+		// Apply idle timeout setting live (helps on-demand feel faster by keeping sessions warm longer).
+		m.idleTimeout = getFFmpegIdleTimeout()
+
+		// Collect sessions to stop outside the lock.
+		toDelete := make([]string, 0)
+		m.sessionsMux.RLock()
 		for streamID, session := range m.sessions {
-			if session.GetClientCount() == 0 {
-				// If on-demand is disabled, keep the FFmpeg session running.
-				if !session.IsOnDemand() {
-					continue
-				}
-				idleTime := time.Since(session.lastActivity)
-				if idleTime > m.idleTimeout {
-					log.Printf("⏰ FFmpeg session idle for %v, stopping: %s", idleTime, streamID)
-					session.Stop()
-					delete(m.sessions, streamID)
-				}
+			if session.GetClientCount() != 0 {
+				continue
+			}
+			// If on-demand is disabled, keep the FFmpeg session running.
+			if !session.IsOnDemand() {
+				continue
+			}
+			idleTime := time.Since(session.lastActivity)
+			if idleTime > m.idleTimeout {
+				toDelete = append(toDelete, streamID)
 			}
 		}
-		m.sessionsMux.Unlock()
+		m.sessionsMux.RUnlock()
+
+		for _, streamID := range toDelete {
+			log.Printf("⏰ FFmpeg session idle for %v, stopping: %s", m.idleTimeout, streamID)
+			m.DeleteSession(streamID)
+		}
 	}
 }
 
@@ -520,12 +804,12 @@ func (s *FFmpegSession) GetStats() map[string]interface{} {
 
 	uptime := time.Since(s.startTime).Seconds()
 	now := time.Now()
-	
+
 	// Add current sample to history
 	s.bytesHistory = append(s.bytesHistory, bytesRead)
 	s.bytesWriteHistory = append(s.bytesWriteHistory, bytesWritten)
 	s.timeHistory = append(s.timeHistory, now)
-	
+
 	// Keep only last 10 samples (sliding window ~30 seconds at 3s interval)
 	maxSamples := 10
 	if len(s.bytesHistory) > maxSamples {
@@ -533,21 +817,21 @@ func (s *FFmpegSession) GetStats() map[string]interface{} {
 		s.bytesWriteHistory = s.bytesWriteHistory[1:]
 		s.timeHistory = s.timeHistory[1:]
 	}
-	
+
 	// Calculate average rate over the sliding window
 	// Note: Mbps here means megabits/sec (bytes/sec * 8).
 	downloadMbps := float64(0)
 	uploadMbps := float64(0)
-	
+
 	if len(s.bytesHistory) >= 2 {
 		// Calculate rate from oldest to newest sample in window
 		oldestIdx := 0
 		newestIdx := len(s.bytesHistory) - 1
-		
+
 		bytesDiffRead := s.bytesHistory[newestIdx] - s.bytesHistory[oldestIdx]
 		bytesDiffWritten := s.bytesWriteHistory[newestIdx] - s.bytesWriteHistory[oldestIdx]
 		timeDiff := s.timeHistory[newestIdx].Sub(s.timeHistory[oldestIdx]).Seconds()
-		
+
 		if timeDiff > 0 {
 			downloadMbps = (float64(bytesDiffRead) * 8 / timeDiff) / 1024 / 1024
 			uploadMbps = (float64(bytesDiffWritten) * 8 / timeDiff) / 1024 / 1024
@@ -555,16 +839,16 @@ func (s *FFmpegSession) GetStats() map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"id":              s.ID,
-		"active":          s.IsActive(),
-		"clients":         s.GetClientCount(),
-		"output_format":   s.OutputFormat,
-		"uptime_seconds":  uptime,
-		"last_activity":   s.lastActivity,
-		"bytes_read":      bytesRead,
-		"bytes_written":   bytesWritten,
-		"download_mbps":   downloadMbps,
-		"upload_mbps":     uploadMbps,
+		"id":             s.ID,
+		"active":         s.IsActive(),
+		"clients":        s.GetClientCount(),
+		"output_format":  s.OutputFormat,
+		"uptime_seconds": uptime,
+		"last_activity":  s.lastActivity,
+		"bytes_read":     bytesRead,
+		"bytes_written":  bytesWritten,
+		"download_mbps":  downloadMbps,
+		"upload_mbps":    uploadMbps,
 	}
 }
 
