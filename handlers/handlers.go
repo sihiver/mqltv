@@ -417,6 +417,23 @@ func StreamRelay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Defensive: if a request for HLS accidentally matches this generic handler (route order / regex quirks),
+	// forward internally to the proper HLS handlers.
+	if strings.Contains(path, "/hls/") {
+		parts := strings.SplitN(path, "/hls/", 2)
+		base := parts[0]
+		seg := parts[1]
+		r2 := mux.SetURLVars(r, map[string]string{"path": base, "segment": seg})
+		StreamRelayHLSSegment(w, r2)
+		return
+	}
+	if strings.HasSuffix(path, "/hls") {
+		base := strings.TrimSuffix(path, "/hls")
+		r2 := mux.SetURLVars(r, map[string]string{"path": base})
+		StreamRelayHLS(w, r2)
+		return
+	}
+
 	// Verify user credentials and check if active
 	// Password from M3U URL is already MD5 hashed
 	var userID int
@@ -1381,7 +1398,7 @@ func StreamRelayHLS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify user credentials and check if active
-	passwordHash := fmt.Sprintf("%x", md5.Sum([]byte(password)))
+	// Password from M3U URL is already MD5 hashed.
 	var userID int
 	var isActive bool
 	var expiresAt sql.NullTime
@@ -1390,7 +1407,7 @@ func StreamRelayHLS(w http.ResponseWriter, r *http.Request) {
 		SELECT id, is_active, expires_at 
 		FROM users 
 		WHERE username = ? AND password = ?
-	`, username, passwordHash).Scan(&userID, &isActive, &expiresAt)
+	`, username, password).Scan(&userID, &isActive, &expiresAt)
 
 	if err == sql.ErrNoRows {
 		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
@@ -1410,21 +1427,136 @@ func StreamRelayHLS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Load sources from relays; if missing and the path is channel-{id}, fall back to channels.source_url.
+	var urls []string
 	var sourceURLs string
 	err = database.DB.QueryRow("SELECT source_urls FROM relays WHERE output_path = ? AND active = 1", path).Scan(&sourceURLs)
-	if err == sql.ErrNoRows {
-		http.Error(w, "Relay not found", http.StatusNotFound)
-		return
+	if err == nil {
+		_ = json.Unmarshal([]byte(sourceURLs), &urls)
+	} else if err == sql.ErrNoRows && strings.HasPrefix(path, "channel-") {
+		if id, err2 := strconv.Atoi(strings.TrimPrefix(path, "channel-")); err2 == nil {
+			var chURL string
+			var active int
+			if err3 := database.DB.QueryRow("SELECT url, active FROM channels WHERE id = ?", id).Scan(&chURL, &active); err3 == nil {
+				if active == 0 {
+					http.Error(w, "Channel is disabled", http.StatusForbidden)
+					return
+				}
+				urls = []string{chURL}
+			}
+		}
 	} else if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	var urls []string
-	json.Unmarshal([]byte(sourceURLs), &urls)
+	if len(urls) == 0 {
+		if strings.HasPrefix(path, "channel-") {
+			http.Error(w, "Channel not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Relay not found", http.StatusNotFound)
+		return
+	}
 
 	if len(urls) == 0 {
 		http.Error(w, "No source URLs configured", http.StatusInternalServerError)
+		return
+	}
+
+	// If the upstream source is already HLS, proxy the playlist directly.
+	// This avoids requiring FFmpeg to parse codecs (useful on constrained OpenWrt builds).
+	upstreamURL := urls[0]
+	if strings.Contains(strings.ToLower(upstreamURL), ".m3u8") {
+		client := &http.Client{Timeout: 15 * time.Second}
+		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upstreamURL, nil)
+		if err != nil {
+			http.Error(w, "Invalid upstream URL", http.StatusBadRequest)
+			return
+		}
+		req.Header.Set("User-Agent", "iptv-panel")
+		resp, err := client.Do(req)
+		if err != nil {
+			http.Error(w, "Failed to fetch upstream playlist", http.StatusBadGateway)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			http.Error(w, "Upstream playlist returned error", http.StatusBadGateway)
+			return
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			http.Error(w, "Failed to read upstream playlist", http.StatusBadGateway)
+			return
+		}
+
+		base, err := url.Parse(upstreamURL)
+		if err != nil {
+			http.Error(w, "Invalid upstream URL", http.StatusBadRequest)
+			return
+		}
+
+		public := publicBaseURL(r)
+		proxyPrefix := fmt.Sprintf("%s/stream/%s/hls/seg?u=", public, path)
+		userQS := url.QueryEscape(username)
+		passQS := url.QueryEscape(password)
+
+		scanner := bufio.NewScanner(bytes.NewReader(body))
+		// Support long playlist lines
+		scanner.Buffer(make([]byte, 1024), 1024*1024)
+		var out strings.Builder
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" {
+				out.WriteString("\n")
+				continue
+			}
+
+			if strings.HasPrefix(line, "#") {
+				// Rewrite common HLS URI attributes (KEY/MAP/I-FRAME-STREAM-INF).
+				const key = "URI=\""
+				idx := strings.Index(line, key)
+				if idx >= 0 {
+					start := idx + len(key)
+					endRel := strings.Index(line[start:], "\"")
+					if endRel > 0 {
+						uriVal := line[start : start+endRel]
+						if ref, err := url.Parse(uriVal); err == nil {
+							abs := base.ResolveReference(ref)
+							prox := fmt.Sprintf("%s%s&username=%s&password=%s", proxyPrefix, url.QueryEscape(abs.String()), userQS, passQS)
+							line = line[:start] + prox + line[start+endRel:]
+						}
+					}
+				}
+				out.WriteString(line)
+				out.WriteString("\n")
+				continue
+			}
+
+			// Segment or nested playlist URI
+			ref, err := url.Parse(line)
+			if err != nil {
+				out.WriteString(line)
+				out.WriteString("\n")
+				continue
+			}
+			abs := base.ResolveReference(ref)
+			prox := fmt.Sprintf("%s%s&username=%s&password=%s", proxyPrefix, url.QueryEscape(abs.String()), userQS, passQS)
+			out.WriteString(prox)
+			out.WriteString("\n")
+		}
+		if err := scanner.Err(); err != nil {
+			http.Error(w, "Failed to parse upstream playlist", http.StatusBadGateway)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(out.String()))
 		return
 	}
 
@@ -1484,16 +1616,72 @@ func StreamRelayHLSSegment(w http.ResponseWriter, r *http.Request) {
 	path := vars["path"]
 	segment := vars["segment"]
 
-	// Get relay source URLs
-	var sourceURLs string
-	err := database.DB.QueryRow("SELECT source_urls FROM relays WHERE output_path = ? AND active = 1", path).Scan(&sourceURLs)
-	if err != nil {
-		http.Error(w, "Relay not found", http.StatusNotFound)
+	// Authenticate user (segments should not be publicly fetchable)
+	username := r.URL.Query().Get("username")
+	password := r.URL.Query().Get("password")
+	if username == "" || password == "" {
+		http.Error(w, "Authentication required: username and password parameters missing", http.StatusUnauthorized)
 		return
 	}
 
+	var isActive bool
+	var expiresAt sql.NullTime
+	if err := database.DB.QueryRow(`
+		SELECT is_active, expires_at 
+		FROM users 
+		WHERE username = ? AND password = ?
+	`, username, password).Scan(&isActive, &expiresAt); err == sql.ErrNoRows {
+		http.Error(w, "Invalid username or password", http.StatusUnauthorized)
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !isActive {
+		ServeExpiredImage(w, r)
+		return
+	}
+	if expiresAt.Valid && expiresAt.Time.Before(time.Now()) {
+		ServeExpiredImage(w, r)
+		return
+	}
+
+	// If an explicit upstream URL is provided, proxy it directly.
+	if upstream := r.URL.Query().Get("u"); upstream != "" {
+		defaultHLSProxyCache.ServeUpstream(w, r, upstream)
+		return
+	}
+
+	// Get relay source URLs; if missing and the path is channel-{id}, fall back to channels.source_url.
 	var urls []string
-	json.Unmarshal([]byte(sourceURLs), &urls)
+	var sourceURLs string
+	err := database.DB.QueryRow("SELECT source_urls FROM relays WHERE output_path = ? AND active = 1", path).Scan(&sourceURLs)
+	if err == nil {
+		_ = json.Unmarshal([]byte(sourceURLs), &urls)
+	} else if err == sql.ErrNoRows && strings.HasPrefix(path, "channel-") {
+		if id, err2 := strconv.Atoi(strings.TrimPrefix(path, "channel-")); err2 == nil {
+			var chURL string
+			var active int
+			if err3 := database.DB.QueryRow("SELECT url, active FROM channels WHERE id = ?", id).Scan(&chURL, &active); err3 == nil {
+				if active == 0 {
+					http.Error(w, "Channel is disabled", http.StatusForbidden)
+					return
+				}
+				urls = []string{chURL}
+			}
+		}
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if len(urls) == 0 {
+		if strings.HasPrefix(path, "channel-") {
+			http.Error(w, "Channel not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "Relay not found", http.StatusNotFound)
+		return
+	}
 
 	if len(urls) > 0 {
 		// Try to construct segment URL from base URL
@@ -1506,29 +1694,7 @@ func StreamRelayHLSSegment(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		segmentURL := baseURL[:lastSlash+1] + segment
-
-		// Proxy the segment
-		resp, err := http.Get(segmentURL)
-		if err != nil {
-			http.Error(w, "Failed to fetch segment", http.StatusBadGateway)
-			return
-		}
-		defer resp.Body.Close()
-
-		w.Header().Set("Content-Type", "video/MP2T")
-		w.Header().Set("Cache-Control", "max-age=10")
-		w.WriteHeader(resp.StatusCode)
-
-		buffer := make([]byte, 32*1024)
-		for {
-			n, err := resp.Body.Read(buffer)
-			if n > 0 {
-				w.Write(buffer[:n])
-			}
-			if err != nil {
-				break
-			}
-		}
+		defaultHLSProxyCache.ServeUpstream(w, r, segmentURL)
 		return
 	}
 

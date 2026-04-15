@@ -764,7 +764,11 @@ func GenerateUserPlaylist(w http.ResponseWriter, r *http.Request) {
 
 		m3uContent += fmt.Sprintf("#EXTINF:-1 tvg-id=\"%d\" tvg-name=\"%s\" tvg-logo=\"%s\" group-title=\"%s\",%s\n",
 			ch.ID, ch.Name, ch.Logo, ch.Group, ch.Name)
-		m3uContent += fmt.Sprintf("%s/stream/%s?username=%s&password=%s\n",
+		streamPath := "/stream/%s"
+		if strings.Contains(strings.ToLower(ch.SourceURL), ".m3u8") {
+			streamPath = "/stream/%s/hls"
+		}
+		m3uContent += fmt.Sprintf("%s"+streamPath+"?username=%s&password=%s\n",
 			baseURL, relayPath, user.Username, user.Password)
 		channelCount++
 	}

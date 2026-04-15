@@ -1,14 +1,28 @@
 package main
 
 import (
+	"embed"
+	"encoding/json"
 	"iptv-panel/database"
 	"iptv-panel/handlers"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/gorilla/mux"
 )
+
+// Embedded web assets so the binary can run standalone (e.g. on OpenWrt).
+//
+//go:embed pannel/dist-pro/**
+var vueDist embed.FS
+
+//go:embed static/**
+var legacyStatic embed.FS
+
+var buildTime = "dev"
+var gitCommit = "dev"
 
 func main() {
 	// Initialize database
@@ -37,6 +51,24 @@ func main() {
 	// Setup router
 	r := mux.NewRouter()
 
+	// Public version endpoint (useful on embedded deployments like OpenWrt)
+	r.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"build_time": buildTime,
+			"git_commit": gitCommit,
+		})
+	}).Methods("GET")
+
+	vueDistFS, err := fs.Sub(vueDist, "pannel/dist-pro")
+	if err != nil {
+		log.Fatal("Failed to prepare embedded Vue dist FS:", err)
+	}
+	legacyStaticFS, err := fs.Sub(legacyStatic, "static")
+	if err != nil {
+		log.Fatal("Failed to prepare embedded static FS:", err)
+	}
+
 	// CORS middleware for all routes
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -61,9 +93,8 @@ func main() {
 	r.HandleFunc("/api/auth/check", handlers.CheckAuth).Methods("GET")
 	// User login (public) - for client apps (Android)
 	r.HandleFunc("/api/user/login", handlers.UserLogin).Methods("POST")
-	r.HandleFunc("/login.html", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./static/login.html")
-	}).Methods("GET")
+	r.Handle("/login.html", http.FileServer(http.FS(legacyStaticFS))).Methods("GET")
+	r.Handle("/expired.html", http.FileServer(http.FS(legacyStaticFS))).Methods("GET")
 
 	// Proxy channel stream (public with user auth - must be before api subrouter)
 	r.HandleFunc("/api/proxy/channel/{id}", handlers.ProxyChannel).Methods("GET")
@@ -143,9 +174,10 @@ func main() {
 	api.HandleFunc("/generated-playlists", handlers.SaveGeneratedPlaylist).Methods("POST")
 
 	// Stream relay endpoints (on-demand, multi-client)
-	r.HandleFunc("/stream/{path:.+}", handlers.StreamRelay).Methods("GET")
+	// Important: register more-specific HLS routes before the generic /stream/{path}.
+	r.HandleFunc("/stream/{path:.+}/hls/{segment:.+}", handlers.StreamRelayHLSSegment).Methods("GET")
 	r.HandleFunc("/stream/{path:.+}/hls", handlers.StreamRelayHLS).Methods("GET")
-	r.HandleFunc("/stream/{path:.+}/hls/{segment}", handlers.StreamRelayHLSSegment).Methods("GET")
+	r.HandleFunc("/stream/{path:.+}", handlers.StreamRelay).Methods("GET")
 
 	// Serve user playlists with short URL: /mql/{user}.m3u
 	r.HandleFunc("/mql/{user:[a-zA-Z0-9_-]+}.m3u", handlers.ServeUserPlaylist).Methods("GET")
@@ -153,8 +185,8 @@ func main() {
 	// Serve generated playlists (legacy support)
 	r.PathPrefix("/generated_playlists/").Handler(http.StripPrefix("/generated_playlists/", http.FileServer(http.Dir("./generated_playlists"))))
 
-	// Serve Vue panel static files (production build)
-	r.PathPrefix("/").Handler(handlers.StaticAuthMiddleware(http.FileServer(http.Dir("./pannel/dist-pro"))))
+	// Serve Vue panel static files (embedded production build)
+	r.PathPrefix("/").Handler(handlers.StaticAuthMiddleware(http.FileServer(http.FS(vueDistFS))))
 
 	// Get port from environment or use default
 	port := os.Getenv("PORT")

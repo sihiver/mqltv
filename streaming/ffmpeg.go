@@ -240,7 +240,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-reconnect_streamed", "1",    // Reconnect for streamed protocols
 		"-reconnect_delay_max", "5",   // Max 5 seconds between reconnects
 		"-timeout", "10000000",        // 10 second timeout (in microseconds)
-		"-fflags", "+genpts+discardcorrupt", // Generate PTS + discard corrupt packets
+		"-fflags", "+genpts",          // Generate PTS (avoid dropping video on sources that mark packets corrupt)
 		"-flags", "low_delay",         // Low delay flag
 		"-analyzeduration", "5000000", // 5 seconds analysis (detect all streams)
 		"-probesize", "5000000",       // 5MB probe (ensure video detected)
@@ -251,11 +251,11 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-f", "mpegts",                // Output format MPEG-TS
 		"-avoid_negative_ts", "make_zero", // Avoid timestamp issues
 		"-max_muxing_queue_size", "9999", // Large muxing queue for stability
+		"-mpegts_flags", "+resend_headers", // Re-send PAT/PMT and codec headers regularly (fixes audio-only on some sources)
+		"-muxdelay", "0",
+		"-muxpreload", "0",
+		"-flush_packets", "1",
 		"-bsf:v", "h264_mp4toannexb,dump_extra", // H264 conversion + dump extra data (SPS/PPS)
-		"-async", "1",                 // Audio sync method (resample)
-		"-vsync", "cfr",               // Video sync constant frame rate
-		"-start_at_zero",              // Start timestamps at zero
-		"-copytb", "1",                // Copy input timebase
 		"pipe:1",                      // Output to stdout
 	}
 
@@ -267,7 +267,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			"-reconnect_streamed", "1",
 			"-reconnect_delay_max", "5",
 			"-timeout", "10000000",
-			"-fflags", "+genpts+discardcorrupt",
+			"-fflags", "+genpts",
 			"-flags", "low_delay",
 			"-analyzeduration", "5000000", // 5 seconds analysis
 			"-probesize", "5000000",       // 5MB probe
@@ -278,11 +278,11 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			"-f", "mpegts",
 			"-avoid_negative_ts", "make_zero",
 			"-max_muxing_queue_size", "9999",
+			"-mpegts_flags", "+resend_headers",
+			"-muxdelay", "0",
+			"-muxpreload", "0",
+			"-flush_packets", "1",
 			"-bsf:v", "h264_mp4toannexb,dump_extra",
-			"-async", "1",
-			"-vsync", "cfr",
-			"-start_at_zero",
-			"-copytb", "1",
 			"pipe:1",
 		}
 	}

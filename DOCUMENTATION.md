@@ -76,6 +76,39 @@ go build -o iptv-panel main.go
 ./iptv-panel
 ```
 
+### Build untuk ARM (Cortex-A7 / ARMv7, NEON/VFPv4)
+
+Target seperti **arm_cortex-a7_neon-vfpv4** umumnya kompatibel dengan **ARMv7 (GOARM=7)**.
+
+Catatan penting: project ini memakai SQLite driver `github.com/mattn/go-sqlite3` yang butuh **CGO**.
+Jadi build untuk ARM bisa dengan 2 cara:
+
+#### Opsi 1 (paling mudah): build langsung di device ARM
+Install Go + build biasa:
+
+```bash
+go build -o iptv-panel main.go
+```
+
+#### Opsi 2: cross-compile dari x86_64 (butuh cross-compiler)
+
+1) Install toolchain ARM (Debian/Ubuntu):
+
+```bash
+sudo apt update
+sudo apt install -y gcc-arm-linux-gnueabihf
+```
+
+2) Build binary ARMv7:
+
+```bash
+env GOOS=linux GOARCH=arm GOARM=7 \
+  CGO_ENABLED=1 CC=arm-linux-gnueabihf-gcc \
+  go build -o iptv-panel-armv7 main.go
+```
+
+Jika kamu dapat error seperti “build constraints exclude all Go files” untuk `go-sqlite3`, itu biasanya karena `CGO_ENABLED=0` atau compiler `CC` belum benar.
+
 ### Akses Panel
 ```
 http://localhost:8080
