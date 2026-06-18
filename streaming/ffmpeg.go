@@ -4,16 +4,96 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"iptv-panel/database"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
+
+// resolveHLSMasterPlaylist detects HLS master playlists and resolves them to a
+// single media sub-playlist. This avoids multi-program/multi-bitrate inputs that
+// cause timestamp discontinuities and player force-close on mobile devices.
+func resolveHLSMasterPlaylist(inputURL string) string {
+	if !strings.Contains(strings.ToLower(inputURL), ".m3u8") {
+		return inputURL
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(inputURL)
+	if err != nil {
+		log.Printf("⚠️  HLS resolve: failed to fetch playlist: %v", err)
+		return inputURL
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return inputURL
+	}
+
+	content := string(body)
+
+	// Not a master playlist – already a media playlist
+	if !strings.Contains(content, "#EXT-X-STREAM-INF") {
+		return inputURL
+	}
+
+	type variant struct {
+		bandwidth int
+		url       string
+	}
+	var variants []variant
+
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "#EXT-X-STREAM-INF") {
+			continue
+		}
+		bw := 0
+		if idx := strings.Index(line, "BANDWIDTH="); idx >= 0 {
+			rest := line[idx+10:]
+			if end := strings.IndexAny(rest, ",\r\n"); end >= 0 {
+				rest = rest[:end]
+			}
+			bw, _ = strconv.Atoi(strings.TrimSpace(rest))
+		}
+		for j := i + 1; j < len(lines); j++ {
+			next := strings.TrimSpace(lines[j])
+			if next == "" || strings.HasPrefix(next, "#") {
+				continue
+			}
+			if !strings.HasPrefix(next, "http") {
+				base := inputURL[:strings.LastIndex(inputURL, "/")+1]
+				next = base + next
+			}
+			variants = append(variants, variant{bw, next})
+			break
+		}
+	}
+
+	if len(variants) == 0 {
+		return inputURL
+	}
+
+	// Sort ascending by bandwidth – pick the highest stable bitrate
+	sort.Slice(variants, func(i, j int) bool {
+		return variants[i].bandwidth < variants[j].bandwidth
+	})
+
+	// Use the HIGHEST bitrate variant (best quality, single program = stable)
+	chosen := variants[len(variants)-1]
+	log.Printf("🎯 HLS Master detected → using single sub-playlist (%d bps): %s", chosen.bandwidth, chosen.url)
+	return chosen.url
+}
 
 func getFFmpegSettingInt(key string, defaultValue int) int {
 	if database.DB == nil {
@@ -481,6 +561,10 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 	_, watchdogInterval := getFFmpegWatchdogConfig()
 	reconnectDelayMaxSeconds, timeoutMicros, analyzeMicros, probeBytes := getFFmpegStartupProbeConfig()
 
+	// Auto-resolve HLS master playlists to a single sub-playlist.
+	// This prevents multi-program timestamp discontinuities that crash mobile players.
+	sourceURL = resolveHLSMasterPlaylist(sourceURL)
+
 	ua := getFFmpegUserAgent()
 
 	// Build FFmpeg command optimized for multiple concurrent streams
@@ -491,7 +575,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-reconnect_delay_max", strconv.Itoa(reconnectDelayMaxSeconds), // Max seconds between reconnects
 		"-timeout", strconv.Itoa(timeoutMicros), // Input timeout (microseconds)
 		"-user_agent", ua,
-		"-fflags", "+genpts+discardcorrupt", // Generate PTS + discard corrupt packets
+		"-fflags", "+discardcorrupt", // Discard corrupt packets (remove +genpts: conflicts with copy mode)
 		"-flags", "low_delay", // Low delay flag
 		"-analyzeduration", strconv.Itoa(analyzeMicros), // Analysis duration (microseconds)
 		"-probesize", strconv.Itoa(probeBytes), // Probe size (bytes)
