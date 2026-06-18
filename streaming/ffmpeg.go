@@ -503,15 +503,10 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-f", "mpegts", // Output format MPEG-TS
 		"-avoid_negative_ts", "make_zero", // Avoid timestamp issues
 		"-max_muxing_queue_size", "9999", // Large muxing queue for stability
-		"-mpegts_flags", "+resend_headers", // Re-send PAT/PMT and codec headers regularly (fixes audio-only on some sources)
+		"-mpegts_flags", "+resend_headers", // Re-send PAT/PMT and codec headers regularly
 		"-muxdelay", "0",
 		"-muxpreload", "0",
 		"-flush_packets", "1",
-		"-bsf:v", "h264_mp4toannexb,dump_extra", // H264 conversion + dump extra data (SPS/PPS)
-		"-async", "1", // Audio sync method (resample)
-		"-vsync", "cfr", // Video sync constant frame rate
-		"-start_at_zero", // Start timestamps at zero
-		"-copytb", "1",   // Copy input timebase
 		"pipe:1", // Output to stdout
 	}
 
