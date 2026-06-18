@@ -101,12 +101,17 @@ func main() {
 		})
 	})
 
-	// Auth routes (public)
+	// Auth routes (public - admin panel)
 	r.HandleFunc("/api/auth/login", handlers.Login).Methods("POST")
 	r.HandleFunc("/api/auth/logout", handlers.Logout).Methods("POST")
 	r.HandleFunc("/api/auth/check", handlers.CheckAuth).Methods("GET")
-	// User login (public) - for client apps (Android)
+	// Android app compatible endpoints (uses different format from admin login)
+	// POST /api/auth/login also handled above but for admin; Android uses email field
+	// We override with a mux approach: Android sends {"email":..} → UserAuthLogin
+	// We use a separate prefix to avoid conflict: /api/user/login still works too.
 	r.HandleFunc("/api/user/login", handlers.UserLogin).Methods("POST")
+	r.HandleFunc("/api/auth/me", handlers.UserAuthMe).Methods("GET")         // Android: GET /api/auth/me (Bearer token)
+	r.HandleFunc("/api/auth/client/login", handlers.UserAuthLogin).Methods("POST") // Android: POST /api/auth/client/login
 	r.Handle("/login.html", http.FileServer(http.FS(legacyStaticFS))).Methods("GET")
 	r.Handle("/expired.html", http.FileServer(http.FS(legacyStaticFS))).Methods("GET")
 
