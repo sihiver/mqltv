@@ -609,10 +609,14 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			n, err := stderr.Read(buf)
 			if n > 0 {
 				errMsg := string(buf[:n])
+				// Ignore harmless decoding spam during stream copy
+				if strings.Contains(errMsg, "decode_slice_header error") || strings.Contains(errMsg, "no frame!") {
+					continue
+				}
 				// Log FFmpeg errors/warnings
 				if strings.Contains(errMsg, "error") || strings.Contains(errMsg, "Error") ||
 					strings.Contains(errMsg, "Invalid") || strings.Contains(errMsg, "failed") {
-					log.Printf("🔴 FFmpeg error for %s: %s", s.ID, errMsg)
+					log.Printf("🔴 FFmpeg error for %s: %s", s.ID, strings.TrimSpace(errMsg))
 					s.errorMux.Lock()
 					s.lastError = strings.TrimSpace(errMsg)
 					s.lastErrorTime = time.Now()
