@@ -649,24 +649,26 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-reconnect_delay_max", strconv.Itoa(reconnectDelayMaxSeconds), // Max seconds between reconnects
 		"-timeout", strconv.Itoa(timeoutMicros), // Input timeout (microseconds)
 		"-user_agent", ua,
-		"-fflags", "+discardcorrupt", // Discard corrupt packets (remove +genpts: conflicts with copy mode)
-		"-flags", "low_delay", // Low delay flag
+		// NOTE: NO -fflags +discardcorrupt (drops keyframes at segment boundaries → gap → ExoPlayer crash)
+		// NOTE: NO -flags low_delay (causes ExoPlayer timestamp issues)
 		"-analyzeduration", strconv.Itoa(analyzeMicros), // Analysis duration (microseconds)
 		"-probesize", strconv.Itoa(probeBytes), // Probe size (bytes)
 		"-i", sourceURL, // Input URL
 		"-map", "0:v:0?", // Map ONLY first video stream (prevents multi-stream crash)
 		"-map", "0:a:0?", // Map ONLY first audio stream
 		"-sn",            // Drop subtitles
-		"-c", "copy", // Copy codec (no transcoding)
-		"-f", "mpegts", // Output format MPEG-TS
-		"-reset_timestamps", "1", // Reset timestamps to zero (fixes huge DTS from HLS sources)
-		"-avoid_negative_ts", "make_zero",
-		"-max_interleave_delta", "0", // Fix PES packet size mismatch errors
+		"-dn",            // Drop data streams (timed_id3, etc.)
+		"-c", "copy",     // Copy codec (no transcoding)
+		"-f", "mpegts",   // Output format MPEG-TS
+		// NOTE: NO -reset_timestamps 1 (causes container/bitstream PTS mismatch → ExoPlayer crash)
+		// NOTE: NO -avoid_negative_ts (causes timestamp manipulation → ExoPlayer crash)
+		// NOTE: NO -max_interleave_delta 0 (experimental, can cause issues)
 		"-max_muxing_queue_size", "4096",
-		"-mpegts_flags", "+resend_headers",
+		// NOTE: NO -mpegts_flags +resend_headers (unexpected PAT/PMT can confuse ExoPlayer)
 		"-flush_packets", "1",
 		"pipe:1", // Output to stdout
 	}
+
 
 	// If HLS output is requested
 	if s.OutputFormat == "hls" {
