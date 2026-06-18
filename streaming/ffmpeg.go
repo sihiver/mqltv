@@ -501,11 +501,11 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-sn",            // Drop subtitles
 		"-c", "copy", // Copy codec (no transcoding)
 		"-f", "mpegts", // Output format MPEG-TS
-		"-avoid_negative_ts", "make_zero", // Avoid timestamp issues
-		"-max_muxing_queue_size", "9999", // Large muxing queue for stability
-		"-mpegts_flags", "+resend_headers", // Re-send PAT/PMT and codec headers regularly
-		"-muxdelay", "0",
-		"-muxpreload", "0",
+		"-reset_timestamps", "1", // Reset timestamps to zero (fixes huge DTS from HLS sources)
+		"-avoid_negative_ts", "make_zero",
+		"-max_interleave_delta", "0", // Fix PES packet size mismatch errors
+		"-max_muxing_queue_size", "4096",
+		"-mpegts_flags", "+resend_headers",
 		"-flush_packets", "1",
 		"pipe:1", // Output to stdout
 	}
