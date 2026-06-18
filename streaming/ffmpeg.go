@@ -496,8 +496,9 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-analyzeduration", strconv.Itoa(analyzeMicros), // Analysis duration (microseconds)
 		"-probesize", strconv.Itoa(probeBytes), // Probe size (bytes)
 		"-i", sourceURL, // Input URL
-		"-map", "0:v?", // Map video stream (optional, won't fail if missing)
-		"-map", "0:a?", // Map audio stream (optional, won't fail if missing)
+		"-map", "0:v:0?", // Map ONLY first video stream (prevents multi-stream crash)
+		"-map", "0:a:0?", // Map ONLY first audio stream
+		"-sn",            // Drop subtitles
 		"-c", "copy", // Copy codec (no transcoding)
 		"-f", "mpegts", // Output format MPEG-TS
 		"-avoid_negative_ts", "make_zero", // Avoid timestamp issues
