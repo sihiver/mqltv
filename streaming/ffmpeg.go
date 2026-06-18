@@ -89,83 +89,12 @@ func resolveHLSMasterPlaylist(inputURL string) string {
 		return variants[i].bandwidth < variants[j].bandwidth
 	})
 
-	// Probe available bandwidth by downloading the first segment of the lowest variant.
-	// We use the lowest-bitrate playlist to find a segment URL.
-	lowestVariantURL := variants[0].url
-	measuredBps := probeHLSBandwidth(lowestVariantURL)
-
-	// Pick the highest bitrate variant that fits within 80% of measured bandwidth.
-	// (80% safety margin to handle network jitter and server overhead)
-	chosen := variants[0] // default: lowest
-	if measuredBps > 0 {
-		for _, v := range variants {
-			if v.bandwidth <= int(float64(measuredBps)*0.80) {
-				chosen = v
-			}
-		}
-	}
-
-	log.Printf("🎯 HLS Master: bandwidth probe=%d bps → using %d bps sub-playlist: %s",
-		measuredBps, chosen.bandwidth, chosen.url)
+	// Always pick the highest bitrate variant (best quality).
+	// The resolver already ensures a single-program sub-playlist, which is what
+	// stabilises the stream — not the bitrate selection.
+	chosen := variants[len(variants)-1]
+	log.Printf("🎯 HLS Master → sub-playlist %d bps: %s", chosen.bandwidth, chosen.url)
 	return chosen.url
-}
-
-// probeHLSBandwidth fetches the first segment URL from an HLS media playlist and
-// measures the download speed in bits-per-second. Returns 0 on any error.
-func probeHLSBandwidth(mediaPlaylistURL string) int {
-	client := &http.Client{Timeout: 15 * time.Second}
-
-	// Fetch the media playlist to get the first segment URL
-	resp, err := client.Get(mediaPlaylistURL)
-	if err != nil {
-		return 0
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return 0
-	}
-
-	// Find first .ts segment URL
-	baseURL := mediaPlaylistURL[:strings.LastIndex(mediaPlaylistURL, "/")+1]
-	var segmentURL string
-	for _, line := range strings.Split(string(body), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if !strings.HasPrefix(line, "http") {
-			segmentURL = baseURL + line
-		} else {
-			segmentURL = line
-		}
-		break
-	}
-	if segmentURL == "" {
-		return 0
-	}
-
-	// Download the segment and measure speed
-	start := time.Now()
-	segResp, err := client.Get(segmentURL)
-	if err != nil {
-		return 0
-	}
-	defer segResp.Body.Close()
-	n, err := io.Copy(io.Discard, segResp.Body)
-	if err != nil && n == 0 {
-		return 0
-	}
-	elapsed := time.Since(start).Seconds()
-	if elapsed <= 0 {
-		return 0
-	}
-
-	// bytes → bits per second
-	bps := int(float64(n*8) / elapsed)
-	log.Printf("📡 HLS bandwidth probe: downloaded %d bytes in %.2fs = %d bps (%.1f Mbps)",
-		n, elapsed, bps, float64(bps)/1_000_000)
-	return bps
 }
 
 
