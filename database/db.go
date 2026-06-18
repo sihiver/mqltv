@@ -2,7 +2,12 @@ package database
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -214,5 +219,44 @@ func runMigrations() {
 func Close() {
 	if DB != nil {
 		DB.Close()
+	}
+}
+
+// BackupDatabase safely backups the SQLite database to a new file in the backups directory
+func BackupDatabase() error {
+	if DB == nil {
+		return fmt.Errorf("database not initialized")
+	}
+
+	if err := os.MkdirAll("backups", 0755); err != nil {
+		return err
+	}
+
+	filename := fmt.Sprintf("backups/iptv_backup_%s.db", time.Now().Format("2006-01-02_15-04-05"))
+	_, err := DB.Exec(fmt.Sprintf("VACUUM INTO '%s'", filename))
+	if err == nil {
+		log.Printf("✅ Database backed up successfully to %s", filename)
+	} else {
+		log.Printf("⚠️ Database backup failed: %v", err)
+	}
+	return err
+}
+
+// CleanupOldBackups removes backup files older than maxDays
+func CleanupOldBackups(maxDays int) {
+	files, err := os.ReadDir("backups")
+	if err != nil {
+		return
+	}
+
+	cutoff := time.Now().AddDate(0, 0, -maxDays)
+	for _, file := range files {
+		if !file.IsDir() && strings.HasPrefix(file.Name(), "iptv_backup_") && strings.HasSuffix(file.Name(), ".db") {
+			info, err := file.Info()
+			if err == nil && info.ModTime().Before(cutoff) {
+				os.Remove(filepath.Join("backups", file.Name()))
+				log.Printf("🗑️ Deleted old backup: %s", file.Name())
+			}
+		}
 	}
 }
