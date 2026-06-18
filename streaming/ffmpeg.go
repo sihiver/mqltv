@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"iptv-panel/database"
 	"log"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -259,6 +261,7 @@ func GetFFmpegManager() *FFmpegManager {
 		ffmpegManager.persistedBytesRead = getStatsSettingUint64("stats_total_bytes_read", 0)
 		ffmpegManager.persistedBytesWrite = getStatsSettingUint64("stats_total_bytes_write", 0)
 		go ffmpegManager.monitorSessions()
+		go ffmpegManager.cleanupOldFiles()
 	})
 	return ffmpegManager
 }
@@ -509,6 +512,9 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 
 	// If HLS output is requested
 	if s.OutputFormat == "hls" {
+		outputDir := filepath.Join("hls_cache", s.ID)
+		os.MkdirAll(outputDir, 0755)
+
 		args = []string{
 			"-threads", "1",
 			"-reconnect", "1",
@@ -524,15 +530,12 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			"-map", "0:v?", // Map video (optional)
 			"-map", "0:a?", // Map audio (optional)
 			"-c", "copy",
-			"-f", "mpegts",
-			"-avoid_negative_ts", "make_zero",
-			"-max_muxing_queue_size", "9999",
-			"-bsf:v", "h264_mp4toannexb,dump_extra",
-			"-async", "1",
-			"-vsync", "cfr",
-			"-start_at_zero",
-			"-copytb", "1",
-			"pipe:1",
+			"-f", "hls",
+			"-hls_time", "4",
+			"-hls_list_size", "6",
+			"-hls_flags", "delete_segments+append_list",
+			"-progress", "pipe:1", // Send progress to stdout to keep watchdog alive
+			filepath.Join(outputDir, "index.m3u8"),
 		}
 	}
 
@@ -898,4 +901,36 @@ func (m *FFmpegManager) GetSession(streamID string) *FFmpegSession {
 	m.sessionsMux.RLock()
 	defer m.sessionsMux.RUnlock()
 	return m.sessions[streamID]
+}
+
+// cleanupOldFiles removes old HLS files periodically
+func (m *FFmpegManager) cleanupOldFiles() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	baseDir := "./hls_cache"
+
+	for range ticker.C {
+		// Remove directories not in active sessions
+		m.sessionsMux.RLock()
+		activeDirs := make(map[string]bool)
+		for streamID := range m.sessions {
+			activeDirs[streamID] = true
+		}
+		m.sessionsMux.RUnlock()
+
+		// Clean up inactive directories
+		dirs, _ := os.ReadDir(baseDir)
+		for _, dir := range dirs {
+			if dir.IsDir() && !activeDirs[dir.Name()] {
+				dirPath := filepath.Join(baseDir, dir.Name())
+				if info, err := os.Stat(dirPath); err == nil {
+					if time.Since(info.ModTime()) > 10*time.Minute {
+						os.RemoveAll(dirPath)
+						log.Printf("🧹 Cleaned up old HLS directory: %s", dir.Name())
+					}
+				}
+			}
+		}
+	}
 }

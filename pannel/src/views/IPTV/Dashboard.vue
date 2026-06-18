@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ContentWrap } from '@/components/ContentWrap'
 import { Icon } from '@/components/Icon'
-import { ElRow, ElCol, ElCard, ElStatistic, ElTable, ElTableColumn, ElTag } from 'element-plus'
+import { ElRow, ElCol, ElCard, ElStatistic, ElTable, ElTableColumn, ElTag, ElAlert } from 'element-plus'
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import request from '@/axios'
 import * as echarts from 'echarts'
@@ -14,6 +14,9 @@ const stats = ref({
   active_channels: 0,
   total_relays: 0
 })
+
+// System alerts
+const failingStreams = ref<any[]>([])
 
 // Bandwidth data
 const bandwidth = ref({
@@ -62,6 +65,21 @@ const loadBandwidth = async () => {
     const res = await request.get({ url: '/api/streams/status' })
     if (res && res.data) {
       const streams = Array.isArray(res.data.streams) ? res.data.streams : []
+      
+      // Check for failing streams
+      const failing = []
+      for (const stream of streams) {
+        if (stream.last_error && stream.id && stream.id.startsWith('channel_') && !stream.id.endsWith('_hls')) {
+          failing.push({
+            id: stream.id,
+            channelId: stream.id.replace('channel_', ''),
+            error: stream.last_error,
+            restarts: stream.restarts || 0
+          })
+        }
+      }
+      failingStreams.value = failing
+
       const bytesRead = Number(res.data.total_bytes_read || 0)
       const bytesWritten = Number(res.data.total_bytes_write || 0)
 
@@ -296,6 +314,26 @@ onUnmounted(() => {
 
 <template>
   <ContentWrap title="IPTV Dashboard" message="Monitor and manage your IPTV system">
+    <!-- System Alerts -->
+    <div v-if="failingStreams.length > 0" style="margin-bottom: 20px">
+      <ElAlert
+        title="⚠️ System Alert: Stream Errors Detected"
+        type="error"
+        :closable="false"
+      >
+        <template #default>
+          <div style="margin-top: 8px">
+            <div v-for="stream in failingStreams" :key="stream.id" style="margin-bottom: 4px; font-size: 13px">
+              <strong>Channel ID {{ stream.channelId }}:</strong> {{ stream.error }}
+            </div>
+            <div style="margin-top: 8px; font-size: 12px; font-style: italic">
+              Please check the Channels menu to manage or reconfigure failing streams.
+            </div>
+          </div>
+        </template>
+      </ElAlert>
+    </div>
+
     <!-- Statistics Cards -->
     <ElRow :gutter="20" style="margin-bottom: 20px">
       <ElCol :xs="12" :sm="12" :md="6">
