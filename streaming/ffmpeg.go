@@ -93,6 +93,20 @@ func getFFmpegExecutable() string {
 	return ffmpegPath
 }
 
+func getFFmpegUserAgent() string {
+	if database.DB == nil {
+		return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+	}
+	var value string
+	err := database.DB.QueryRow(
+		"SELECT value FROM settings WHERE key = 'ffmpeg_user_agent' AND category = 'ffmpeg'",
+	).Scan(&value)
+	if err != nil || strings.TrimSpace(value) == "" {
+		return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+	}
+	return strings.TrimSpace(value)
+}
+
 func getFFmpegWatchdogConfig() (noDataTimeout time.Duration, interval time.Duration) {
 	noDataTimeoutSeconds := getFFmpegSettingInt("no_data_timeout_seconds", 20)
 	watchdogIntervalSeconds := getFFmpegSettingInt("watchdog_interval_seconds", 5)
@@ -460,6 +474,8 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 	_, watchdogInterval := getFFmpegWatchdogConfig()
 	reconnectDelayMaxSeconds, timeoutMicros, analyzeMicros, probeBytes := getFFmpegStartupProbeConfig()
 
+	ua := getFFmpegUserAgent()
+
 	// Build FFmpeg command optimized for multiple concurrent streams
 	args := []string{
 		"-threads", "1", // Limit to 1 thread per stream
@@ -467,6 +483,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-reconnect_streamed", "1", // Reconnect for streamed protocols
 		"-reconnect_delay_max", strconv.Itoa(reconnectDelayMaxSeconds), // Max seconds between reconnects
 		"-timeout", strconv.Itoa(timeoutMicros), // Input timeout (microseconds)
+		"-user_agent", ua,
 		"-fflags", "+genpts+discardcorrupt", // Generate PTS + discard corrupt packets
 		"-flags", "low_delay", // Low delay flag
 		"-analyzeduration", strconv.Itoa(analyzeMicros), // Analysis duration (microseconds)
@@ -494,6 +511,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			"-reconnect_streamed", "1",
 			"-reconnect_delay_max", strconv.Itoa(reconnectDelayMaxSeconds),
 			"-timeout", strconv.Itoa(timeoutMicros),
+			"-user_agent", ua,
 			"-fflags", "+genpts+discardcorrupt",
 			"-flags", "low_delay",
 			"-analyzeduration", strconv.Itoa(analyzeMicros),
