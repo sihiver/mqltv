@@ -206,6 +206,10 @@ type FFmpegSession struct {
 	lastFailTime  time.Time // Last time FFmpeg failed
 	isBlacklisted bool      // If true, stop trying to restart
 
+	lastError     string
+	lastErrorTime time.Time
+	errorMux      sync.RWMutex
+
 	// Real-time bandwidth tracking with sliding window
 	lastBytesRead       uint64
 	lastBytesWritten    uint64
@@ -605,6 +609,10 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 				if strings.Contains(errMsg, "error") || strings.Contains(errMsg, "Error") ||
 					strings.Contains(errMsg, "Invalid") || strings.Contains(errMsg, "failed") {
 					log.Printf("🔴 FFmpeg error for %s: %s", s.ID, errMsg)
+					s.errorMux.Lock()
+					s.lastError = strings.TrimSpace(errMsg)
+					s.lastErrorTime = time.Now()
+					s.errorMux.Unlock()
 				}
 			}
 			if err != nil {
@@ -852,17 +860,24 @@ func (s *FFmpegSession) GetStats() map[string]interface{} {
 		}
 	}
 
+	s.errorMux.RLock()
+	lastErr := s.lastError
+	lastErrTime := s.lastErrorTime
+	s.errorMux.RUnlock()
+
 	return map[string]interface{}{
-		"id":             s.ID,
-		"active":         s.IsActive(),
-		"clients":        s.GetClientCount(),
-		"output_format":  s.OutputFormat,
-		"uptime_seconds": uptime,
-		"last_activity":  s.lastActivity,
-		"bytes_read":     bytesRead,
-		"bytes_written":  bytesWritten,
-		"download_mbps":  downloadMbps,
-		"upload_mbps":    uploadMbps,
+		"id":              s.ID,
+		"active":          s.IsActive(),
+		"clients":         s.GetClientCount(),
+		"output_format":   s.OutputFormat,
+		"uptime_seconds":  uptime,
+		"last_activity":   s.lastActivity,
+		"bytes_read":      bytesRead,
+		"bytes_written":   bytesWritten,
+		"download_mbps":   downloadMbps,
+		"upload_mbps":     uploadMbps,
+		"last_error":      lastErr,
+		"last_error_time": lastErrTime,
 	}
 }
 

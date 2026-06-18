@@ -155,13 +155,33 @@ async function updateStreamStatus() {
         
         document.querySelectorAll('.stream-status').forEach(el => {
             const channelId = el.getAttribute('data-channel');
-            const stream = data.streams && data.streams.find(s => s.stream_id === `channel_${channelId}`);
+            // Backend returns data in data.data.streams
+            const streams = data.data && data.data.streams ? data.data.streams : [];
+            const stream = streams.find(s => 
+                s.id === `channel_${channelId}` || 
+                s.id === `channel_${channelId}_hls` || 
+                s.id === `channel-${channelId}`
+            );
             
-            if (stream && stream.active) {
-                el.textContent = `🟢 Streaming (${stream.client_count} viewers)`;
-                el.style.color = '#28a745';
+            if (stream) {
+                let statusHtml = '';
+                if (stream.active) {
+                    statusHtml = `🟢 Streaming (${stream.clients} viewers)`;
+                    el.style.color = '#28a745';
+                } else {
+                    statusHtml = '⏸️ Stopped';
+                    el.style.color = '#6c757d';
+                }
+
+                if (stream.last_error) {
+                    // Escape quotes for HTML title attribute
+                    const safeError = stream.last_error.replace(/"/g, '&quot;');
+                    statusHtml += ` <span title="${safeError}" style="cursor:help;">⚠️ Error Log</span>`;
+                }
+                
+                el.innerHTML = statusHtml;
             } else {
-                el.textContent = '⏸️ Stopped';
+                el.innerHTML = '⏸️ Stopped';
                 el.style.color = '#6c757d';
             }
         });
