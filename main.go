@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -47,6 +48,19 @@ func main() {
 			log.Printf("🧹 Cleaned up %d stale connection(s) from previous session", rows)
 		}
 	}
+
+	// Start auto-backup goroutine (Daily)
+	go func() {
+		// Initial backup on startup
+		_ = database.BackupDatabase()
+		database.CleanupOldBackups(7)
+
+		ticker := time.NewTicker(24 * time.Hour)
+		for range ticker.C {
+			_ = database.BackupDatabase()
+			database.CleanupOldBackups(7)
+		}
+	}()
 
 	// Setup router
 	r := mux.NewRouter()
