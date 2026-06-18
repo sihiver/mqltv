@@ -582,6 +582,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		// NOTE: NO -flags low_delay (causes ExoPlayer timestamp issues)
 		"-analyzeduration", strconv.Itoa(analyzeMicros), // Analysis duration (microseconds)
 		"-probesize", strconv.Itoa(probeBytes), // Probe size (bytes)
+		"-re",           // Read input at native framerate (prevents TCP backpressure from stalling HLS downloads)
 		"-i", sourceURL, // Input URL
 		"-map", "0:v:0?", // Map ONLY first video stream (prevents multi-stream crash)
 		"-map", "0:a:0?", // Map ONLY first audio stream
