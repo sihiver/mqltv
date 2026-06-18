@@ -23,6 +23,7 @@ import Hls from 'hls.js'
 
 const channels = ref<any[]>([])
 const activeChannelIds = ref<Set<number>>(new Set())
+const streamStatus = ref<Map<number, any>>(new Map())
 const categories = ref<string[]>([])
 const playlists = ref<any[]>([])
 const searchQuery = ref('')
@@ -217,6 +218,26 @@ const loadActiveChannels = async () => {
     }
   } catch (error) {
     console.error('Error loading active channels:', error)
+  }
+}
+
+const loadStreamStatus = async () => {
+  try {
+    const res = await request.get({ url: '/api/streams/status' })
+    if (res && res.data && Array.isArray(res.data.streams)) {
+      const newStatus = new Map()
+      res.data.streams.forEach((s: any) => {
+        if (s.id && s.id.startsWith('channel_') && !s.id.endsWith('_hls')) {
+          const chId = parseInt(s.id.replace('channel_', ''))
+          if (!isNaN(chId)) {
+            newStatus.set(chId, s)
+          }
+        }
+      })
+      streamStatus.value = newStatus
+    }
+  } catch (error) {
+    console.error('Error loading stream status:', error)
   }
 }
 
@@ -544,10 +565,12 @@ onMounted(() => {
   loadChannels()
   loadPlaylists()
   loadActiveChannels()
+  loadStreamStatus()
 
   // Refresh active channels every 5 seconds
   activeChannelsInterval = setInterval(() => {
     loadActiveChannels()
+    loadStreamStatus()
   }, 5000)
 })
 
@@ -658,16 +681,25 @@ onUnmounted(() => {
 
       <ElTableColumn prop="playlist_name" label="Playlist" width="150" />
 
-      <ElTableColumn label="Status" width="120">
+      <ElTableColumn label="Status" width="160">
         <template #default="{ row }">
-          <ElTag v-if="activeChannelIds.has(row.id)" type="success">
-            <Icon icon="ep:video-play" style="margin-right: 4px" />
-            Streaming
-          </ElTag>
-          <ElTag v-else type="info">
-            <Icon icon="ep:video-pause" style="margin-right: 4px" />
-            Stopped
-          </ElTag>
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <ElTag v-if="activeChannelIds.has(row.id)" type="success">
+              <Icon icon="ep:video-play" style="margin-right: 4px" />
+              Watched
+            </ElTag>
+            <ElTag v-else type="info">
+              <Icon icon="ep:video-pause" style="margin-right: 4px" />
+              Idle
+            </ElTag>
+
+            <ElTag v-if="streamStatus.get(row.id)?.last_error" type="danger" style="cursor: help" :title="streamStatus.get(row.id)?.last_error">
+              <Icon icon="ep:warning" style="margin-right: 4px" /> Error
+            </ElTag>
+            <ElTag v-else-if="streamStatus.get(row.id)?.active" type="success">
+              <Icon icon="ep:cpu" style="margin-right: 4px" /> Transcoding
+            </ElTag>
+          </div>
         </template>
       </ElTableColumn>
 

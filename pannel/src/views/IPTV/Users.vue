@@ -12,7 +12,10 @@ import {
   ElInput,
   ElDatePicker,
   ElMessage,
-  ElMessageBox
+  ElMessageBox,
+  ElDropdown,
+  ElDropdownMenu,
+  ElDropdownItem
 } from 'element-plus'
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -273,6 +276,16 @@ const showUserDetail = (user: any) => {
   router.push(`/users/detail/${user.id}`)
 }
 
+const handleDropdown = (command: string, row: any) => {
+  if (command === 'set_expiry') {
+    openExpiryDialog(row)
+  } else if (command === 'clear_expiry') {
+    clearExpiryForUser(row)
+  } else if (command === 'set_expired') {
+    setExpiredNow(row)
+  }
+}
+
 onMounted(() => {
   loadUsers()
 })
@@ -287,78 +300,93 @@ onMounted(() => {
       Create New User
     </ElButton>
 
-    <ElTable :data="users" v-loading="loading" style="width: 100%">
+    <ElTable :data="users" v-loading="loading" style="width: 100%" stripe :header-cell-style="{ background: '#f5f7fa', color: '#606266', fontWeight: 'bold' }">
       <ElTableColumn prop="username" label="Username" min-width="150">
         <template #default="{ row }">
-          <ElButton type="primary" text @click="showUserDetail(row)" style="padding: 0">
-            {{ row.username }}
-          </ElButton>
+          <div class="flex items-center gap-2">
+            <ElButton type="primary" link @click="showUserDetail(row)" class="font-bold text-lg">
+              {{ row.username }}
+            </ElButton>
+            <ElTag v-if="row.disabled" type="danger" size="small" effect="dark">Disabled</ElTag>
+          </div>
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="Status" width="120">
+      <ElTableColumn label="Status / Expiry" width="160">
         <template #default="{ row }">
-          <ElTag :type="getStatusType(row.expires_at)">
-            {{ formatExpiry(row.expires_at) }}
+          <ElTag :type="getStatusType(row.expires_at)" effect="light" class="font-semibold" round>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <Icon v-if="getStatusType(row.expires_at) === 'success'" icon="ep:circle-check" />
+              <Icon v-else-if="getStatusType(row.expires_at) === 'warning'" icon="ep:warning" />
+              <Icon v-else-if="getStatusType(row.expires_at) === 'danger'" icon="ep:circle-close" />
+              <Icon v-else icon="ep:info-filled" />
+              <span>{{ formatExpiry(row.expires_at) }}</span>
+            </div>
           </ElTag>
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="Days Remaining" width="140">
+      <ElTableColumn label="Days Left" width="120" align="center">
         <template #default="{ row }">
-          <span v-if="row?.is_expired">Expired</span>
-          <span v-else>{{ row?.days_remaining ?? '-' }}</span>
+          <span v-if="row?.is_expired" style="color: var(--el-color-danger); font-weight: bold;">Expired</span>
+          <span v-else-if="!row?.expires_at" style="color: var(--el-color-info); font-weight: bold;">Unlimited</span>
+          <span v-else style="font-weight: bold;" :style="{ color: (row?.days_remaining || 0) <= 7 ? 'var(--el-color-warning)' : 'var(--el-color-success)' }">
+            {{ row?.days_remaining }} days
+          </span>
         </template>
       </ElTableColumn>
 
-      <ElTableColumn prop="created_at" label="Created" width="180">
+      <ElTableColumn prop="created_at" label="Created At" width="180">
         <template #default="{ row }">
-          {{ new Date(row.created_at).toLocaleString() }}
+          <span style="color: #909399; font-size: 0.9em;">
+            <Icon icon="ep:clock" style="vertical-align: middle; margin-right: 4px;" />
+            {{ new Date(row.created_at).toLocaleDateString() }}
+          </span>
         </template>
       </ElTableColumn>
 
-      <ElTableColumn label="Actions" width="520" fixed="right">
+      <ElTableColumn label="Actions" width="220" fixed="right" align="center">
         <template #default="{ row }">
-          <ElButton type="primary" size="small" text @click="openExtendDialog(row)">
-            <template #icon>
-              <Icon icon="ep:calendar" />
-            </template>
-            Extend
-          </ElButton>
-          <ElButton type="info" size="small" text @click="openExpiryDialog(row)">
-            <template #icon>
-              <Icon icon="ep:date" />
-            </template>
-            Set Expiry
-          </ElButton>
-          <ElButton type="warning" size="small" text @click="clearExpiryForUser(row)">
-            <template #icon>
-              <Icon icon="ep:refresh" />
-            </template>
-            Clear Expiry
-          </ElButton>
-          <ElButton type="danger" size="small" text @click="setExpiredNow(row)">
-            <template #icon>
-              <Icon icon="ep:warning" />
-            </template>
-            Set Expired
-          </ElButton>
-          <ElButton
-            :type="row.disabled ? 'success' : 'warning'"
-            size="small"
-            text
-            @click="toggleUserStatus(row)"
-          >
-            <template #icon>
-              <Icon :icon="row.disabled ? 'ep:check' : 'ep:close'" />
-            </template>
-            {{ row.disabled ? 'Enable' : 'Disable' }}
-          </ElButton>
-          <ElButton type="danger" size="small" @click="deleteUser(row)">
-            <template #icon>
-              <Icon icon="ep:delete" />
-            </template>
-          </ElButton>
+          <div style="display: flex; justify-content: center; gap: 8px; align-items: center;">
+            <ElButton type="primary" size="small" plain @click="openExtendDialog(row)" title="Extend Subscription">
+              <template #icon><Icon icon="ep:calendar" /></template>
+              Extend
+            </ElButton>
+            
+            <ElButton
+              :type="row.disabled ? 'success' : 'warning'"
+              size="small"
+              circle
+              plain
+              @click="toggleUserStatus(row)"
+              :title="row.disabled ? 'Enable User' : 'Disable User'"
+            >
+              <template #icon><Icon :icon="row.disabled ? 'ep:video-play' : 'ep:video-pause'" /></template>
+            </ElButton>
+            
+            <ElButton type="danger" size="small" circle plain @click="deleteUser(row)" title="Delete User">
+              <template #icon><Icon icon="ep:delete" /></template>
+            </ElButton>
+
+            <ElDropdown trigger="click" @command="(cmd) => handleDropdown(cmd, row)">
+              <ElButton type="info" size="small" circle plain title="More Actions">
+                <template #icon><Icon icon="ep:more" /></template>
+              </ElButton>
+              <template #dropdown>
+                <ElDropdownMenu>
+                  <ElDropdownItem command="set_expiry">
+                    <Icon icon="ep:date" style="margin-right: 8px;" /> Set Expiry Date
+                  </ElDropdownItem>
+                  <ElDropdownItem command="clear_expiry">
+                    <Icon icon="ep:refresh" style="margin-right: 8px;" /> Clear Expiry (Unlimited)
+                  </ElDropdownItem>
+                  <ElDropdownItem command="set_expired" divided style="color: var(--el-color-danger)">
+                    <Icon icon="ep:warning" style="margin-right: 8px;" /> Mark as Expired Now
+                  </ElDropdownItem>
+                </ElDropdownMenu>
+              </template>
+            </ElDropdown>
+          </div>
         </template>
       </ElTableColumn>
     </ElTable>

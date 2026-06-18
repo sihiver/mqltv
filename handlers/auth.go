@@ -304,6 +304,11 @@ func StaticAuthMiddleware(next http.Handler) http.Handler {
 		
 		// For root path and all other routes, serve index.html (Vue SPA handles routing)
 		// Vue router will handle /login, /dashboard, etc.
+		if r.Method == "GET" {
+			http.ServeFile(w, r, "./pannel/dist-pro/index.html")
+			return
+		}
+		
 		next.ServeHTTP(w, r)
 	})
 }

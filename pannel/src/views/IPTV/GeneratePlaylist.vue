@@ -13,7 +13,7 @@ import {
   ElCol,
   ElCard
 } from 'element-plus'
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onActivated, computed } from 'vue'
 import request from '@/axios'
 
 const users = ref<any[]>([])
@@ -122,6 +122,11 @@ const generatePlaylist = async () => {
 }
 
 onMounted(() => {
+  loadUsers()
+  loadChannels()
+})
+
+onActivated(() => {
   loadUsers()
   loadChannels()
 })

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"iptv-panel/database"
 	"log"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -91,6 +93,20 @@ func getFFmpegExecutable() string {
 		return "ffmpeg"
 	}
 	return ffmpegPath
+}
+
+func getFFmpegUserAgent() string {
+	if database.DB == nil {
+		return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+	}
+	var value string
+	err := database.DB.QueryRow(
+		"SELECT value FROM settings WHERE key = 'ffmpeg_user_agent' AND category = 'ffmpeg'",
+	).Scan(&value)
+	if err != nil || strings.TrimSpace(value) == "" {
+		return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+	}
+	return strings.TrimSpace(value)
 }
 
 func getFFmpegWatchdogConfig() (noDataTimeout time.Duration, interval time.Duration) {
@@ -192,6 +208,10 @@ type FFmpegSession struct {
 	lastFailTime  time.Time // Last time FFmpeg failed
 	isBlacklisted bool      // If true, stop trying to restart
 
+	lastError     string
+	lastErrorTime time.Time
+	errorMux      sync.RWMutex
+
 	// Real-time bandwidth tracking with sliding window
 	lastBytesRead       uint64
 	lastBytesWritten    uint64
@@ -241,6 +261,7 @@ func GetFFmpegManager() *FFmpegManager {
 		ffmpegManager.persistedBytesRead = getStatsSettingUint64("stats_total_bytes_read", 0)
 		ffmpegManager.persistedBytesWrite = getStatsSettingUint64("stats_total_bytes_write", 0)
 		go ffmpegManager.monitorSessions()
+		go ffmpegManager.cleanupOldFiles()
 	})
 	return ffmpegManager
 }
@@ -460,6 +481,8 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 	_, watchdogInterval := getFFmpegWatchdogConfig()
 	reconnectDelayMaxSeconds, timeoutMicros, analyzeMicros, probeBytes := getFFmpegStartupProbeConfig()
 
+	ua := getFFmpegUserAgent()
+
 	// Build FFmpeg command optimized for multiple concurrent streams
 	args := []string{
 		"-threads", "1", // Limit to 1 thread per stream
@@ -467,6 +490,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-reconnect_streamed", "1", // Reconnect for streamed protocols
 		"-reconnect_delay_max", strconv.Itoa(reconnectDelayMaxSeconds), // Max seconds between reconnects
 		"-timeout", strconv.Itoa(timeoutMicros), // Input timeout (microseconds)
+		"-user_agent", ua,
 		"-fflags", "+genpts+discardcorrupt", // Generate PTS + discard corrupt packets
 		"-flags", "low_delay", // Low delay flag
 		"-analyzeduration", strconv.Itoa(analyzeMicros), // Analysis duration (microseconds)
@@ -492,12 +516,16 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 
 	// If HLS output is requested
 	if s.OutputFormat == "hls" {
+		outputDir := filepath.Join("hls_cache", s.ID)
+		os.MkdirAll(outputDir, 0755)
+
 		args = []string{
 			"-threads", "1",
 			"-reconnect", "1",
 			"-reconnect_streamed", "1",
 			"-reconnect_delay_max", strconv.Itoa(reconnectDelayMaxSeconds),
 			"-timeout", strconv.Itoa(timeoutMicros),
+			"-user_agent", ua,
 			"-fflags", "+genpts+discardcorrupt",
 			"-flags", "low_delay",
 			"-analyzeduration", strconv.Itoa(analyzeMicros),
@@ -506,15 +534,12 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			"-map", "0:v?", // Map video (optional)
 			"-map", "0:a?", // Map audio (optional)
 			"-c", "copy",
-			"-f", "mpegts",
-			"-avoid_negative_ts", "make_zero",
-			"-max_muxing_queue_size", "9999",
-			"-mpegts_flags", "+resend_headers",
-			"-muxdelay", "0",
-			"-muxpreload", "0",
-			"-flush_packets", "1",
-			"-bsf:v", "h264_mp4toannexb,dump_extra",
-			"pipe:1",
+			"-f", "hls",
+			"-hls_time", "4",
+			"-hls_list_size", "6",
+			"-hls_flags", "delete_segments+append_list",
+			"-progress", "pipe:1", // Send progress to stdout to keep watchdog alive
+			filepath.Join(outputDir, "index.m3u8"),
 		}
 	}
 
@@ -591,6 +616,10 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 				if strings.Contains(errMsg, "error") || strings.Contains(errMsg, "Error") ||
 					strings.Contains(errMsg, "Invalid") || strings.Contains(errMsg, "failed") {
 					log.Printf("🔴 FFmpeg error for %s: %s", s.ID, errMsg)
+					s.errorMux.Lock()
+					s.lastError = strings.TrimSpace(errMsg)
+					s.lastErrorTime = time.Now()
+					s.errorMux.Unlock()
 				}
 			}
 			if err != nil {
@@ -838,17 +867,24 @@ func (s *FFmpegSession) GetStats() map[string]interface{} {
 		}
 	}
 
+	s.errorMux.RLock()
+	lastErr := s.lastError
+	lastErrTime := s.lastErrorTime
+	s.errorMux.RUnlock()
+
 	return map[string]interface{}{
-		"id":             s.ID,
-		"active":         s.IsActive(),
-		"clients":        s.GetClientCount(),
-		"output_format":  s.OutputFormat,
-		"uptime_seconds": uptime,
-		"last_activity":  s.lastActivity,
-		"bytes_read":     bytesRead,
-		"bytes_written":  bytesWritten,
-		"download_mbps":  downloadMbps,
-		"upload_mbps":    uploadMbps,
+		"id":              s.ID,
+		"active":          s.IsActive(),
+		"clients":         s.GetClientCount(),
+		"output_format":   s.OutputFormat,
+		"uptime_seconds":  uptime,
+		"last_activity":   s.lastActivity,
+		"bytes_read":      bytesRead,
+		"bytes_written":   bytesWritten,
+		"download_mbps":   downloadMbps,
+		"upload_mbps":     uploadMbps,
+		"last_error":      lastErr,
+		"last_error_time": lastErrTime,
 	}
 }
 
@@ -869,4 +905,36 @@ func (m *FFmpegManager) GetSession(streamID string) *FFmpegSession {
 	m.sessionsMux.RLock()
 	defer m.sessionsMux.RUnlock()
 	return m.sessions[streamID]
+}
+
+// cleanupOldFiles removes old HLS files periodically
+func (m *FFmpegManager) cleanupOldFiles() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	baseDir := "./hls_cache"
+
+	for range ticker.C {
+		// Remove directories not in active sessions
+		m.sessionsMux.RLock()
+		activeDirs := make(map[string]bool)
+		for streamID := range m.sessions {
+			activeDirs[streamID] = true
+		}
+		m.sessionsMux.RUnlock()
+
+		// Clean up inactive directories
+		dirs, _ := os.ReadDir(baseDir)
+		for _, dir := range dirs {
+			if dir.IsDir() && !activeDirs[dir.Name()] {
+				dirPath := filepath.Join(baseDir, dir.Name())
+				if info, err := os.Stat(dirPath); err == nil {
+					if time.Since(info.ModTime()) > 10*time.Minute {
+						os.RemoveAll(dirPath)
+						log.Printf("🧹 Cleaned up old HLS directory: %s", dir.Name())
+					}
+				}
+			}
+		}
+	}
 }
