@@ -531,8 +531,9 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			"-analyzeduration", strconv.Itoa(analyzeMicros),
 			"-probesize", strconv.Itoa(probeBytes),
 			"-i", sourceURL,
-			"-map", "0:v?", // Map video (optional)
-			"-map", "0:a?", // Map audio (optional)
+			"-map", "0:v:0?", // Map ONLY first video (prevents multi-stream crash)
+			"-map", "0:a:0?", // Map ONLY first audio
+			"-sn",            // Drop subtitles (can cause copy crash)
 			"-c", "copy",
 			"-f", "hls",
 			"-hls_time", "4",
