@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export PATH=$PATH:/usr/local/go/bin
+
 # Install Go jika belum terinstall
 if ! command -v go &> /dev/null; then
     echo "Go tidak terinstall. Menginstall Go..."

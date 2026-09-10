@@ -172,6 +172,7 @@ func createDefaultSettings() {
 			"max_streams":                 "100",
 			"enable_hls":                  "true",
 			"hls_segment_duration":        "6",
+			"audio_delay_ms":              "500",
 		},
 		"stream": {
 			"auto_start":       "true",
