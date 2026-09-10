@@ -264,6 +264,10 @@ func getFFmpegStartupProbeConfig() (reconnectDelayMaxSeconds int, timeoutMicros 
 	return reconnectDelayMaxSeconds, timeoutMicros, analyzeMicros, probeBytes
 }
 
+func getFFmpegAudioDelayMs() int {
+	return getFFmpegSettingInt("audio_delay_ms", 500)
+}
+
 // FFmpegSession manages FFmpeg-based streaming
 type FFmpegSession struct {
 	ID            string
@@ -569,6 +573,16 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 	sourceURL = resolveHLSMasterPlaylist(sourceURL)
 
 	ua := getFFmpegUserAgent()
+	audioDelayMs := getFFmpegAudioDelayMs()
+
+	var audioDelayArgs []string
+	if audioDelayMs != 0 {
+		// Bitstream filter to shift audio PTS/DTS without transcoding (saves CPU).
+		// Positive value delays audio (fixes audio playing earlier than video).
+		delaySec := float64(audioDelayMs) / 1000.0
+		audioDelayArgs = []string{"-bsf:a", fmt.Sprintf("setts=ts=TS+(%g)/TB", delaySec)}
+		log.Printf("⏳ Audio delay configured: %d ms (%+.3fs) for stream %s", audioDelayMs, delaySec, s.ID)
+	}
 
 	// Build FFmpeg command optimized for multiple concurrent streams
 	args := []string{
@@ -589,7 +603,12 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-sn",            // Drop subtitles
 		"-dn",            // Drop data streams (timed_id3, etc.)
 		"-c", "copy",     // Copy codec (no transcoding)
-		"-f", "mpegts",   // Output format MPEG-TS
+	}
+	if len(audioDelayArgs) > 0 {
+		args = append(args, audioDelayArgs...)
+	}
+	args = append(args,
+		"-f", "mpegts", // Output format MPEG-TS
 		// NOTE: NO -reset_timestamps 1 (causes container/bitstream PTS mismatch → ExoPlayer crash)
 		// NOTE: NO -avoid_negative_ts (causes timestamp manipulation → ExoPlayer crash)
 		// NOTE: NO -max_interleave_delta 0 (experimental, can cause issues)
@@ -597,8 +616,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		// NOTE: NO -mpegts_flags +resend_headers (unexpected PAT/PMT can confuse ExoPlayer)
 		"-flush_packets", "1",
 		"pipe:1", // Output to stdout
-	}
-
+	)
 
 	// If HLS output is requested
 	if s.OutputFormat == "hls" {
@@ -621,13 +639,18 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			"-map", "0:a:0?", // Map ONLY first audio
 			"-sn",            // Drop subtitles (can cause copy crash)
 			"-c", "copy",
+		}
+		if len(audioDelayArgs) > 0 {
+			args = append(args, audioDelayArgs...)
+		}
+		args = append(args,
 			"-f", "hls",
 			"-hls_time", "4",
 			"-hls_list_size", "6",
 			"-hls_flags", "delete_segments+append_list",
 			"-progress", "pipe:1", // Send progress to stdout to keep watchdog alive
 			filepath.Join(outputDir, "index.m3u8"),
-		}
+		)
 	}
 
 	ffmpegExe := getFFmpegExecutable()

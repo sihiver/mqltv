@@ -47,7 +47,8 @@ const ffmpegSettings = ref({
   watchdog_interval_seconds: 5,
   max_streams: 100,
   enable_hls: true,
-  hls_segment_duration: 6
+  hls_segment_duration: 6,
+  audio_delay_ms: 500
 })
 
 // Stream settings
@@ -599,6 +600,23 @@ onMounted(() => {
                     :max="10"
                     style="width: 100%"
                   />
+                </ElFormItem>
+
+                <ElFormItem label="Audio Delay (ms)">
+                  <div style="width: 100%">
+                    <ElInputNumber
+                      v-model="ffmpegSettings.audio_delay_ms"
+                      :min="-5000"
+                      :max="5000"
+                      :step="50"
+                      style="width: 100%"
+                    />
+                    <div style="margin-top: 6px">
+                      <ElTag type="info" size="small">
+                        500 ms = delay audio 0.5 detik (sinkronisasi jika audio mendahului video). 0 = nonaktif.
+                      </ElTag>
+                    </div>
+                  </div>
                 </ElFormItem>
 
                 <ElFormItem>
