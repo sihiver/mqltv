@@ -431,6 +431,169 @@ func DeleteRelay(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// syncRelaySessionSources updates any active FFmpeg sessions matching a relay output_path
+func syncRelaySessionSources(outputPath string, urls []string) {
+	if len(urls) == 0 {
+		return
+	}
+	ffmpegManager := streaming.GetFFmpegManager()
+	sessionIDs := []string{outputPath, outputPath + "_hls"}
+	if strings.HasPrefix(outputPath, "channel-") {
+		idPart := strings.TrimPrefix(outputPath, "channel-")
+		sessionIDs = append(sessionIDs, "channel_"+idPart, "channel_"+idPart+"_hls")
+	}
+	for _, sid := range sessionIDs {
+		if session := ffmpegManager.GetSession(sid); session != nil {
+			session.UpdateSourceURLs(urls)
+		}
+	}
+}
+
+// UpdateRelay updates an existing relay configuration (including multi-source failover URLs)
+func UpdateRelay(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	relayID := vars["id"]
+
+	var req struct {
+		Name       string   `json:"name"`
+		SourceURL  string   `json:"source_url"`
+		SourceURLs []string `json:"source_urls"`
+		OutputPath string   `json:"output_path"`
+		Active     *bool    `json:"active"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if len(req.SourceURLs) == 0 && req.SourceURL != "" {
+		req.SourceURLs = []string{req.SourceURL}
+	}
+
+	// Clean empty URLs
+	cleanURLs := make([]string, 0, len(req.SourceURLs))
+	for _, u := range req.SourceURLs {
+		trimmed := strings.TrimSpace(u)
+		if trimmed != "" {
+			cleanURLs = append(cleanURLs, trimmed)
+		}
+	}
+	req.SourceURLs = cleanURLs
+
+	if req.OutputPath == "" {
+		http.Error(w, "output_path is required", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" {
+		req.Name = req.OutputPath
+	}
+	if len(req.SourceURLs) == 0 {
+		http.Error(w, "source_urls is required", http.StatusBadRequest)
+		return
+	}
+
+	sourceURLsJSON, _ := json.Marshal(req.SourceURLs)
+
+	activeVal := 1
+	if req.Active != nil {
+		if !*req.Active {
+			activeVal = 0
+		}
+	} else {
+		_ = database.DB.QueryRow("SELECT active FROM relays WHERE id = ?", relayID).Scan(&activeVal)
+	}
+
+	_, err := database.DB.Exec(
+		"UPDATE relays SET name = ?, source_urls = ?, output_path = ?, active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+		req.Name, string(sourceURLsJSON), req.OutputPath, activeVal, relayID,
+	)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Sync updated failover URLs to any active FFmpeg session
+	syncRelaySessionSources(req.OutputPath, req.SourceURLs)
+
+	// If primary URL of a channel-{id} relay changed, also keep channels.url in sync
+	if strings.HasPrefix(req.OutputPath, "channel-") {
+		if chID, err := strconv.Atoi(strings.TrimPrefix(req.OutputPath, "channel-")); err == nil {
+			_, _ = database.DB.Exec("UPDATE channels SET url = ? WHERE id = ?", req.SourceURLs[0], chID)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code": 0,
+		"data": map[string]interface{}{
+			"success": true,
+			"id":      relayID,
+		},
+		"message": "Relay updated successfully",
+	})
+}
+
+// SwitchRelaySource switches the active source URL index for a relay
+func SwitchRelaySource(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	relayID := vars["id"]
+
+	var req struct {
+		SourceIndex int `json:"source_index"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	var outputPath, sourceURLsJSON string
+	err := database.DB.QueryRow("SELECT output_path, source_urls FROM relays WHERE id = ?", relayID).Scan(&outputPath, &sourceURLsJSON)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Relay not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var urls []string
+	_ = json.Unmarshal([]byte(sourceURLsJSON), &urls)
+	if req.SourceIndex < 0 || req.SourceIndex >= len(urls) {
+		http.Error(w, "Invalid source_index", http.StatusBadRequest)
+		return
+	}
+
+	ffmpegManager := streaming.GetFFmpegManager()
+	sessionIDs := []string{outputPath, outputPath + "_hls"}
+	if strings.HasPrefix(outputPath, "channel-") {
+		idPart := strings.TrimPrefix(outputPath, "channel-")
+		sessionIDs = append(sessionIDs, "channel_"+idPart, "channel_"+idPart+"_hls")
+	}
+
+	switchedActive := false
+	for _, sid := range sessionIDs {
+		if session := ffmpegManager.GetSession(sid); session != nil {
+			session.UpdateSourceURLs(urls)
+			if session.SwitchToSource(req.SourceIndex) {
+				switchedActive = true
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"code": 0,
+		"data": map[string]interface{}{
+			"success":         true,
+			"source_index":    req.SourceIndex,
+			"source_url":      urls[req.SourceIndex],
+			"switched_active": switchedActive,
+		},
+		"message": fmt.Sprintf("Switched to Source #%d", req.SourceIndex+1),
+	})
+}
+
 // StreamRelay handles relay streaming with FFmpeg (on-demand multi-client)
 func StreamRelay(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -544,13 +707,13 @@ func StreamRelay(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Generate unique client ID
-	clientID := fmt.Sprintf("%x", md5.Sum([]byte(r.RemoteAddr+r.UserAgent())))
+	// Generate unique client ID per HTTP connection to avoid collision behind reverse proxies or on fast reconnects
+	clientID := fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s|%s|%d", r.RemoteAddr, r.UserAgent(), time.Now().UnixNano()))))
 
 	// Add client and get data channel
 	dataChan, err := session.AddClient(clientID, r.RemoteAddr)
 	if err != nil {
-		http.Error(w, "Channel temporarily unavailable: "+err.Error(), http.StatusServiceUnavailable)
+		ServeOutageNotification(w, r)
 		return
 	}
 	defer session.RemoveClient(clientID)
@@ -573,7 +736,10 @@ func StreamRelay(w http.ResponseWriter, r *http.Request) {
 		select {
 		case data, ok := <-dataChan:
 			if !ok {
-				// Channel closed
+				// If channel closed mid-stream because upstream failed all retries, splice outage notification video stream
+				if session.IsBlacklisted() {
+					streaming.StreamOutageVideo(w, r)
+				}
 				return
 			}
 			if _, err := w.Write(data); err != nil {
@@ -1370,16 +1536,25 @@ func ProxyChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Use FFmpeg manager for consistent proxying
+	// Use FFmpeg manager for consistent proxying (include multi-source relay failover URLs if configured)
+	sourceURLs := []string{url}
+	var relayURLsJSON string
+	if err := database.DB.QueryRow("SELECT source_urls FROM relays WHERE output_path = ? AND active = 1", fmt.Sprintf("channel-%d", channelID)).Scan(&relayURLsJSON); err == nil {
+		var parsed []string
+		if json.Unmarshal([]byte(relayURLsJSON), &parsed) == nil && len(parsed) > 0 {
+			sourceURLs = parsed
+		}
+	}
+
 	ffmpegManager := streaming.GetFFmpegManager()
 	sessionID := fmt.Sprintf("channel_%d", channelID)
-	session := ffmpegManager.GetOrCreateFFmpegSession(sessionID, []string{url}, "mpegts")
+	session := ffmpegManager.GetOrCreateFFmpegSession(sessionID, sourceURLs, "mpegts")
 	session.SetOnDemand(onDemandInt == 1)
 
-	clientID := fmt.Sprintf("%x", md5.Sum([]byte(r.RemoteAddr+r.UserAgent())))
+	clientID := fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s|%s|%d", r.RemoteAddr, r.UserAgent(), time.Now().UnixNano()))))
 	dataChan, err := session.AddClient(clientID, r.RemoteAddr)
 	if err != nil {
-		http.Error(w, "Channel temporarily unavailable: "+err.Error(), http.StatusServiceUnavailable)
+		ServeOutageNotification(w, r)
 		return
 	}
 	defer session.RemoveClient(clientID)
@@ -1399,6 +1574,9 @@ func ProxyChannel(w http.ResponseWriter, r *http.Request) {
 		select {
 		case data, ok := <-dataChan:
 			if !ok {
+				if session.IsBlacklisted() {
+					streaming.StreamOutageVideo(w, r)
+				}
 				return
 			}
 			if _, err := w.Write(data); err != nil {
@@ -1491,38 +1669,47 @@ func StreamRelayHLS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If the upstream source is already HLS, proxy the playlist directly.
+	// If the upstream source is already HLS, proxy the playlist directly (with multi-source failover across urls).
 	// This avoids requiring FFmpeg to parse codecs (useful on constrained OpenWrt builds).
-	upstreamURL := urls[0]
-	if strings.Contains(strings.ToLower(upstreamURL), ".m3u8") {
+	if strings.Contains(strings.ToLower(urls[0]), ".m3u8") {
 		client := &http.Client{Timeout: 15 * time.Second}
-		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upstreamURL, nil)
-		if err != nil {
-			http.Error(w, "Invalid upstream URL", http.StatusBadRequest)
-			return
-		}
-		req.Header.Set("User-Agent", "iptv-panel")
-		resp, err := client.Do(req)
-		if err != nil {
-			http.Error(w, "Failed to fetch upstream playlist", http.StatusBadGateway)
-			return
-		}
-		defer resp.Body.Close()
+		var body []byte
+		var upstreamURL string
 
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			http.Error(w, "Upstream playlist returned error", http.StatusBadGateway)
-			return
+		for _, candidateURL := range urls {
+			if !strings.Contains(strings.ToLower(candidateURL), ".m3u8") {
+				continue
+			}
+			req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, candidateURL, nil)
+			if err != nil {
+				continue
+			}
+			req.Header.Set("User-Agent", "iptv-panel")
+			resp, err := client.Do(req)
+			if err != nil {
+				continue
+			}
+			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+				b, readErr := io.ReadAll(resp.Body)
+				resp.Body.Close()
+				if readErr == nil && len(b) > 0 {
+					body = b
+					upstreamURL = candidateURL
+					break
+				}
+			} else {
+				resp.Body.Close()
+			}
 		}
 
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			http.Error(w, "Failed to read upstream playlist", http.StatusBadGateway)
+		if len(body) == 0 {
+			ServeOutageNotification(w, r)
 			return
 		}
 
 		base, err := url.Parse(upstreamURL)
 		if err != nil {
-			http.Error(w, "Invalid upstream URL", http.StatusBadRequest)
+			ServeOutageNotification(w, r)
 			return
 		}
 
@@ -1606,7 +1793,7 @@ func StreamRelayHLS(w http.ResponseWriter, r *http.Request) {
 	clientID := fmt.Sprintf("%x", md5.Sum([]byte(r.RemoteAddr+r.UserAgent())))
 	_, err = session.AddClient(clientID, r.RemoteAddr)
 	if err != nil {
-		http.Error(w, "Channel temporarily unavailable: "+err.Error(), http.StatusServiceUnavailable)
+		ServeOutageNotification(w, r)
 		return
 	}
 	// Do NOT defer RemoveClient. HLS clients request chunks periodically.
@@ -1624,7 +1811,7 @@ func StreamRelayHLS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !fileExists {
-		http.Error(w, "HLS stream failed to start", http.StatusServiceUnavailable)
+		ServeOutageNotification(w, r)
 		return
 	}
 
@@ -1828,10 +2015,10 @@ func ProxyChannelHLS(w http.ResponseWriter, r *http.Request) {
 	session := ffmpegManager.GetOrCreateFFmpegSession(sessionID, []string{url}, "hls")
 	session.SetOnDemand(onDemandInt == 1)
 
-	clientID := fmt.Sprintf("%x", md5.Sum([]byte(r.RemoteAddr+r.UserAgent())))
+	clientID := fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s|%s|%d", r.RemoteAddr, r.UserAgent(), time.Now().UnixNano()))))
 	dataChan, err := session.AddClient(clientID, r.RemoteAddr)
 	if err != nil {
-		http.Error(w, "Channel temporarily unavailable: "+err.Error(), http.StatusServiceUnavailable)
+		ServeOutageNotification(w, r)
 		return
 	}
 	defer session.RemoveClient(clientID)

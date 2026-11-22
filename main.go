@@ -114,6 +114,9 @@ func main() {
 	r.HandleFunc("/api/auth/client/login", handlers.UserAuthLogin).Methods("POST") // Android: POST /api/auth/client/login
 	r.Handle("/login.html", http.FileServer(http.FS(legacyStaticFS))).Methods("GET")
 	r.Handle("/expired.html", http.FileServer(http.FS(legacyStaticFS))).Methods("GET")
+	r.Handle("/expired.jpg", http.FileServer(http.FS(legacyStaticFS))).Methods("GET")
+	r.Handle("/gangguan.html", http.FileServer(http.FS(legacyStaticFS))).Methods("GET")
+	r.Handle("/gangguan-notification.png", http.FileServer(http.FS(legacyStaticFS))).Methods("GET")
 
 	// Proxy channel stream (public with user auth - must be before api subrouter)
 	r.HandleFunc("/api/proxy/channel/{id}", handlers.ProxyChannel).Methods("GET")
@@ -161,6 +164,8 @@ func main() {
 	// Relays
 	api.HandleFunc("/relays", handlers.GetRelays).Methods("GET")
 	api.HandleFunc("/relays", handlers.CreateRelay).Methods("POST")
+	api.HandleFunc("/relays/{id}", handlers.UpdateRelay).Methods("PUT")
+	api.HandleFunc("/relays/{id}/switch-source", handlers.SwitchRelaySource).Methods("POST")
 	api.HandleFunc("/relays/{id}", handlers.DeleteRelay).Methods("DELETE")
 
 	// Stream status
