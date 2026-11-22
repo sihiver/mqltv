@@ -736,9 +736,9 @@ func StreamRelay(w http.ResponseWriter, r *http.Request) {
 		select {
 		case data, ok := <-dataChan:
 			if !ok {
-				// If channel closed because upstream failed all retries, show outage notification screen
+				// If channel closed mid-stream because upstream failed all retries, splice outage notification video stream
 				if session.IsBlacklisted() {
-					ServeOutageNotification(w, r)
+					streaming.StreamOutageVideo(w, r)
 				}
 				return
 			}
@@ -1575,7 +1575,7 @@ func ProxyChannel(w http.ResponseWriter, r *http.Request) {
 		case data, ok := <-dataChan:
 			if !ok {
 				if session.IsBlacklisted() {
-					ServeOutageNotification(w, r)
+					streaming.StreamOutageVideo(w, r)
 				}
 				return
 			}
