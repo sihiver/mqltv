@@ -193,12 +193,12 @@ func getFFmpegUserAgent() string {
 }
 
 func getFFmpegWatchdogConfig() (noDataTimeout time.Duration, interval time.Duration) {
-	noDataTimeoutSeconds := getFFmpegSettingInt("no_data_timeout_seconds", 20)
-	watchdogIntervalSeconds := getFFmpegSettingInt("watchdog_interval_seconds", 5)
+	noDataTimeoutSeconds := getFFmpegSettingInt("no_data_timeout_seconds", 6)
+	watchdogIntervalSeconds := getFFmpegSettingInt("watchdog_interval_seconds", 1)
 
 	// Allow disabling watchdog entirely with 0.
 	if noDataTimeoutSeconds < 0 {
-		noDataTimeoutSeconds = 20
+		noDataTimeoutSeconds = 6
 	}
 	if noDataTimeoutSeconds > 600 {
 		noDataTimeoutSeconds = 600
@@ -288,12 +288,15 @@ type FFmpegSession struct {
 	lastDataTime  time.Time
 	dataTimeMux   sync.RWMutex
 	pipeWriter    *StreamPipe
-	bytesRead     uint64 // Total bytes from source
-	bytesWritten  uint64 // Total bytes to clients
-	bytesMux      sync.RWMutex
-	retryCount    int       // Number of consecutive failures
-	lastFailTime  time.Time // Last time FFmpeg failed
-	isBlacklisted bool      // If true, stop trying to restart
+	bytesRead                  uint64 // Total bytes from source
+	bytesWritten               uint64 // Total bytes to clients
+	bytesMux                   sync.RWMutex
+	currentSourceIdx           int       // Current active index in SourceURLs for failover rotation
+	retryCount                 int       // Number of consecutive failures
+	corruptRestart             bool      // True when killed by auto-heal due to rain-fade/DTS corruption
+	consecutiveCorruptRestarts int       // Count of consecutive corruption restarts
+	lastFailTime               time.Time // Last time FFmpeg failed
+	isBlacklisted              bool      // If true, stop trying to restart
 
 	lastError     string
 	lastErrorTime time.Time
@@ -392,6 +395,7 @@ func (m *FFmpegManager) GetOrCreateFFmpegSession(streamID string, sourceURLs []s
 
 	if session, exists := m.sessions[streamID]; exists {
 		session.lastActivity = time.Now()
+		session.UpdateSourceURLs(sourceURLs)
 		return session
 	}
 
@@ -463,6 +467,41 @@ func (s *FFmpegSession) IsOnDemand() bool {
 	return s.onDemand
 }
 
+// UpdateSourceURLs updates the failover source URLs list for an existing session.
+func (s *FFmpegSession) UpdateSourceURLs(urls []string) {
+	if len(urls) == 0 {
+		return
+	}
+	s.activeMux.Lock()
+	s.SourceURLs = append([]string(nil), urls...)
+	if s.currentSourceIdx >= len(s.SourceURLs) {
+		s.currentSourceIdx = 0
+	}
+	s.activeMux.Unlock()
+}
+
+// SwitchToSource manually switches the active source index and restarts FFmpeg if active.
+func (s *FFmpegSession) SwitchToSource(index int) bool {
+	s.activeMux.Lock()
+	if index < 0 || index >= len(s.SourceURLs) {
+		s.activeMux.Unlock()
+		return false
+	}
+	s.currentSourceIdx = index
+	s.corruptRestart = true
+	s.consecutiveCorruptRestarts = 0
+	s.retryCount = 0
+	cmd := s.cmd
+	isActive := s.isActive
+	s.activeMux.Unlock()
+
+	if isActive && cmd != nil && cmd.Process != nil {
+		log.Printf("🔀 Manual source switch for %s to source [%d/%d]", s.ID, index+1, len(s.SourceURLs))
+		_ = cmd.Process.Kill()
+	}
+	return true
+}
+
 // AddClient adds a client to FFmpeg session
 func (s *FFmpegSession) AddClient(clientID, remoteAddr string) (chan []byte, error) {
 	// Check if blacklisted
@@ -473,10 +512,12 @@ func (s *FFmpegSession) AddClient(clientID, remoteAddr string) (chan []byte, err
 	s.clientsMux.Lock()
 	defer s.clientsMux.Unlock()
 
-	dataChan := make(chan []byte, 2000) // Large buffer to prevent packet drops
-
 	s.pipeWriter.readersMux.Lock()
-	s.pipeWriter.readers[clientID] = dataChan
+	dataChan, exists := s.pipeWriter.readers[clientID]
+	if !exists {
+		dataChan = make(chan []byte, 2000) // Large buffer to prevent packet drops
+		s.pipeWriter.readers[clientID] = dataChan
+	}
 	s.pipeWriter.readersMux.Unlock()
 
 	client := &StreamClient{
@@ -533,6 +574,13 @@ func (s *FFmpegSession) IsActive() bool {
 	return s.isActive
 }
 
+// IsBlacklisted checks if the session failed all retries due to upstream outage
+func (s *FFmpegSession) IsBlacklisted() bool {
+	s.activeMux.RLock()
+	defer s.activeMux.RUnlock()
+	return s.isBlacklisted
+}
+
 // Start starts FFmpeg streaming
 func (s *FFmpegSession) Start() {
 	s.activeMux.Lock()
@@ -545,16 +593,24 @@ func (s *FFmpegSession) Start() {
 	s.dataTimeMux.Lock()
 	s.lastDataTime = s.startTime
 	s.dataTimeMux.Unlock()
+	startIdx := s.currentSourceIdx
 	s.activeMux.Unlock()
 
 	log.Printf("▶️  Starting FFmpeg stream: %s", s.ID)
 
-	// Try each source until one works
-	for _, url := range s.SourceURLs {
+	// Try each source starting from currentSourceIdx (supports multi-source failover rotation)
+	numSources := len(s.SourceURLs)
+	for i := 0; i < numSources; i++ {
+		idx := (startIdx + i) % numSources
+		url := s.SourceURLs[idx]
+		s.activeMux.Lock()
+		s.currentSourceIdx = idx
+		s.activeMux.Unlock()
+
 		if s.startFFmpeg(url) {
 			return
 		}
-		log.Printf("⚠️  FFmpeg failed for source: %s, trying next...", url)
+		log.Printf("⚠️  FFmpeg failed to spawn for source [%d/%d]: %s, trying next...", idx+1, numSources, url)
 	}
 
 	log.Printf("❌ All sources failed for FFmpeg stream: %s", s.ID)
@@ -592,11 +648,12 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-reconnect_delay_max", strconv.Itoa(reconnectDelayMaxSeconds), // Max seconds between reconnects
 		"-timeout", strconv.Itoa(timeoutMicros), // Input timeout (microseconds)
 		"-user_agent", ua,
+		"-fflags", "+genpts", // Generate missing PTS cleanly without dropping keyframes
 		// NOTE: NO -fflags +discardcorrupt (drops keyframes at segment boundaries → gap → ExoPlayer crash)
 		// NOTE: NO -flags low_delay (causes ExoPlayer timestamp issues)
+		// NOTE: NO -re on live inputs (causes clock drift, HLS 404 segment skips, and TCP buffer overruns)
 		"-analyzeduration", strconv.Itoa(analyzeMicros), // Analysis duration (microseconds)
 		"-probesize", strconv.Itoa(probeBytes), // Probe size (bytes)
-		"-re",           // Read input at native framerate (prevents TCP backpressure from stalling HLS downloads)
 		"-i", sourceURL, // Input URL
 		"-map", "0:v:0?", // Map ONLY first video stream (prevents multi-stream crash)
 		"-map", "0:a:0?", // Map ONLY first audio stream
@@ -613,7 +670,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		// NOTE: NO -avoid_negative_ts (causes timestamp manipulation → ExoPlayer crash)
 		// NOTE: NO -max_interleave_delta 0 (experimental, can cause issues)
 		"-max_muxing_queue_size", "4096",
-		// NOTE: NO -mpegts_flags +resend_headers (unexpected PAT/PMT can confuse ExoPlayer)
+		"-mpegts_flags", "+resend_headers", // Periodically resend PAT/PMT so clients recover after glitches
 		"-flush_packets", "1",
 		"pipe:1", // Output to stdout
 	)
@@ -675,39 +732,61 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 
 	log.Printf("✅ FFmpeg started for source: %s", sourceURL)
 
+	cmd := s.cmd
+	s.bytesMux.RLock()
+	startBytes := s.bytesRead
+	s.bytesMux.RUnlock()
+
 	// Watchdog: if FFmpeg produces no output for a while (upstream stalled/down),
-	// stop & remove the session so it can be recreated when upstream is back.
-	// This re-reads settings periodically so updates apply without server restart.
+	// kill the stuck FFmpeg process so the wait loop can auto-restart or rotate to a backup source
+	// or show the outage notification screen quickly.
 	go func() {
-		timer := time.NewTimer(watchdogInterval)
+		// Poll every 1 second for fast outage reaction
+		checkInterval := 1 * time.Second
+		if watchdogInterval < checkInterval {
+			checkInterval = watchdogInterval
+		}
+		timer := time.NewTimer(checkInterval)
 		defer timer.Stop()
 		for {
 			select {
 			case <-s.ctx.Done():
 				return
 			case <-timer.C:
-				if !s.IsActive() {
+				s.activeMux.RLock()
+				sameCmd := s.isActive && s.cmd == cmd
+				s.activeMux.RUnlock()
+				if !sameCmd {
 					return
 				}
 
-				currentNoDataTimeout, currentInterval := getFFmpegWatchdogConfig()
-				// Schedule next tick using latest interval.
-				timer.Reset(currentInterval)
+				currentNoDataTimeout, _ := getFFmpegWatchdogConfig()
+				timer.Reset(1 * time.Second)
 
 				// If disabled, just keep looping.
 				if currentNoDataTimeout <= 0 {
 					continue
 				}
 
+				// Ensure startup timeout is always at least (analyzeDuration + 4s) so watchdog never kills FFmpeg
+				// while it is still inside avformat_find_stream_info() probing a healthy stream.
+				s.bytesMux.RLock()
+				gotAnyBytes := s.bytesRead > startBytes
+				s.bytesMux.RUnlock()
+
+				effectiveTimeout := currentNoDataTimeout
+				minStartupTimeout := time.Duration(analyzeMicros)*time.Microsecond + 4*time.Second
+				if !gotAnyBytes && effectiveTimeout < minStartupTimeout {
+					effectiveTimeout = minStartupTimeout
+				}
+
 				s.dataTimeMux.RLock()
 				last := s.lastDataTime
 				s.dataTimeMux.RUnlock()
-				if !last.IsZero() && time.Since(last) > currentNoDataTimeout {
-					log.Printf("⚠️  No stream data for %v (upstream likely down). Stopping restream: %s", currentNoDataTimeout, s.ID)
-					if s.owner != nil {
-						s.owner.DeleteSession(s.ID)
-					} else {
-						s.Stop()
+				if !last.IsZero() && time.Since(last) > effectiveTimeout {
+					log.Printf("⚠️  No stream data for %v on %s (upstream stalled). Killing FFmpeg to trigger failover/outage screen...", effectiveTimeout, s.ID)
+					if cmd != nil && cmd.Process != nil {
+						_ = cmd.Process.Kill()
 					}
 					return
 				}
@@ -715,20 +794,61 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		}
 	}()
 
-	// Read FFmpeg stderr in background (for logging errors)
+	// Read FFmpeg stderr in background (for logging errors and auto-restarting on severe DTS/stream corruption)
 	go func() {
 		buf := make([]byte, 4096)
+		var corruptCount int
+		corruptWindowStart := time.Now()
+
 		for {
 			n, err := stderr.Read(buf)
 			if n > 0 {
 				errMsg := string(buf[:n])
-				// Ignore harmless decoding spam during stream copy
-				if strings.Contains(errMsg, "decode_slice_header error") || strings.Contains(errMsg, "no frame!") {
+				// Ignore harmless decoding spam during stream copy (also indicates upstream is actively sending packets during startup probe)
+				if strings.Contains(errMsg, "decode_slice_header error") || strings.Contains(errMsg, "no frame!") || strings.Contains(errMsg, "non-existing PPS") {
+					if time.Since(s.startTime) < 10*time.Second {
+						s.dataTimeMux.Lock()
+						s.lastDataTime = time.Now()
+						s.dataTimeMux.Unlock()
+					}
 					continue
 				}
+
+				// Detect severe muxer/timestamp desync or upstream segment/rain-fade/wind corruption ("kaset rusak" state)
+				dtsErrors := strings.Count(errMsg, "Non-monotonous DTS") +
+					strings.Count(errMsg, "non monotonically increasing dts") +
+					strings.Count(errMsg, "PES packet size mismatch") +
+					strings.Count(errMsg, "out of order") +
+					strings.Count(errMsg, "backward in time") +
+					strings.Count(errMsg, "Failed to open segment") +
+					strings.Count(errMsg, "Server returned 404")
+
+				// Cooldown 15s after start so heavy rain doesn't cause rapid 5s restart loops
+				if dtsErrors > 0 && time.Since(s.startTime) > 15*time.Second {
+					now := time.Now()
+					if now.Sub(corruptWindowStart) > 10*time.Second {
+						corruptWindowStart = now
+						corruptCount = 0
+					}
+					corruptCount += dtsErrors
+					if corruptCount >= 20 {
+						log.Printf("⚠️  Severe stream desync/rain-fade corruption detected for %s (%d errors in %v). Triggering clean auto-heal restart...",
+							s.ID, corruptCount, now.Sub(corruptWindowStart).Round(time.Second))
+						corruptCount = 0
+						s.activeMux.Lock()
+						s.corruptRestart = true
+						s.activeMux.Unlock()
+						if cmd != nil && cmd.Process != nil {
+							_ = cmd.Process.Kill()
+						}
+						return
+					}
+				}
+
 				// Log FFmpeg errors/warnings
 				if strings.Contains(errMsg, "error") || strings.Contains(errMsg, "Error") ||
-					strings.Contains(errMsg, "Invalid") || strings.Contains(errMsg, "failed") {
+					strings.Contains(errMsg, "Invalid") || strings.Contains(errMsg, "failed") ||
+					dtsErrors > 0 {
 					log.Printf("🔴 FFmpeg error for %s: %s", s.ID, strings.TrimSpace(errMsg))
 					s.errorMux.Lock()
 					s.lastError = strings.TrimSpace(errMsg)
@@ -742,7 +862,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		}
 	}()
 
-	// Read FFmpeg stdout and broadcast to all clients (non-blocking)
+	// Read FFmpeg stdout and broadcast 188-byte aligned MPEG-TS packets to all clients
 	go func() {
 		defer func() {
 			s.activeMux.Lock()
@@ -751,14 +871,17 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			log.Printf("⏹️  FFmpeg reader stopped: %s", s.ID)
 		}()
 
-		buffer := make([]byte, 8192) // 8KB buffer - smaller chunks for better distribution
+		const tsPacketSize = 188
+		const tsReadSize = tsPacketSize * 44 // 8272 bytes (exact multiple of 188-byte MPEG-TS packet)
+
+		buffer := make([]byte, tsReadSize)
+		carry := make([]byte, 0, tsReadSize*2)
+
 		for {
 			select {
 			case <-s.ctx.Done():
 				return
 			default:
-				// Non-blocking read with SetReadDeadline would be ideal, but pipes don't support it
-				// Instead, we read in goroutine and use select
 				n, err := stdout.Read(buffer)
 				if err != nil {
 					if err.Error() != "EOF" {
@@ -772,45 +895,96 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 					s.lastDataTime = time.Now()
 					s.dataTimeMux.Unlock()
 
-					data := make([]byte, n)
-					copy(data, buffer[:n])
-
 					// Track bytes read from source
 					s.bytesMux.Lock()
 					s.bytesRead += uint64(n)
 					s.bytesMux.Unlock()
 
-					// Write to buffer
-					s.pipeWriter.buffer.Write(data)
+					var data []byte
+					if s.OutputFormat == "hls" {
+						data = make([]byte, n)
+						copy(data, buffer[:n])
+					} else {
+						// Enforce strict 188-byte MPEG-TS packet alignment & 0x47 sync byte framing
+						carry = append(carry, buffer[:n]...)
+
+						if len(carry) < tsPacketSize {
+							continue
+						}
+
+						// If not aligned to 0x47 sync byte, scan forward for two consecutive 0x47 sync bytes 188 bytes apart
+						if carry[0] != 0x47 {
+							if len(carry) < tsPacketSize*2 {
+								continue
+							}
+							syncIdx := -1
+							limit := len(carry) - tsPacketSize
+							for i := 0; i < limit; i++ {
+								if carry[i] == 0x47 && carry[i+tsPacketSize] == 0x47 {
+									syncIdx = i
+									break
+								}
+							}
+							if syncIdx > 0 {
+								carry = carry[syncIdx:]
+							} else if syncIdx < 0 {
+								// Keep last 188 bytes in case a sync byte is near the boundary
+								carry = carry[len(carry)-tsPacketSize:]
+								continue
+							}
+						}
+
+						alignedLen := (len(carry) / tsPacketSize) * tsPacketSize
+						if alignedLen == 0 {
+							continue
+						}
+
+						// Filter out MPEG-TS packets with Transport Error Indicator (TEI bit: packet[1] & 0x80 != 0)
+						// which commonly appear during Ku-Band satellite rain fade.
+						data = make([]byte, 0, alignedLen)
+						for offset := 0; offset < alignedLen; offset += tsPacketSize {
+							pkt := carry[offset : offset+tsPacketSize]
+							if pkt[0] == 0x47 && (pkt[1]&0x80) == 0 {
+								data = append(data, pkt...)
+							}
+						}
+
+						rem := len(carry) - alignedLen
+						if rem > 0 {
+							copy(carry[:rem], carry[alignedLen:])
+						}
+						carry = carry[:rem]
+
+						if len(data) == 0 {
+							continue
+						}
+					}
 
 					// Broadcast to all clients (blocking with large buffer prevents drops)
 					s.pipeWriter.readersMux.RLock()
 					clientCount := len(s.pipeWriter.readers)
 					for _, ch := range s.pipeWriter.readers {
-						// Blocking send - buffer is large enough (2000)
-						// If buffer fills up, client is too slow and will experience lag
 						select {
 						case ch <- data:
 							// Sent successfully
 						default:
-							// Buffer full - skip this packet for this client
-							// With 2000 buffer, this should be rare
+							// Buffer full - skip this aligned chunk for this client
 						}
 					}
 					s.pipeWriter.readersMux.RUnlock()
 
-					// Track bytes written to clients (n * client_count)
+					// Track bytes written to clients
 					s.bytesMux.Lock()
-					s.bytesWritten += uint64(n * clientCount)
+					s.bytesWritten += uint64(len(data) * clientCount)
 					s.bytesMux.Unlock()
 				}
 			}
 		}
 	}()
 
-	// Wait for FFmpeg to finish and handle restart
+	// Wait for FFmpeg to finish and handle restart / failover
 	go func() {
-		s.cmd.Wait()
+		cmd.Wait()
 
 		// Check if we still have clients
 		s.clientsMux.RLock()
@@ -826,34 +1000,91 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		default:
 			keepRunning := hasClients || !s.IsOnDemand()
 			if keepRunning {
-				// Check if stream is running for less than 30 seconds (likely offline/bad stream)
 				runDuration := time.Since(s.startTime)
+				s.dataTimeMux.RLock()
+				timeSinceLastData := time.Since(s.lastDataTime)
+				s.dataTimeMux.RUnlock()
 
-				// Increment retry count if failed quickly (< 30 seconds)
-				if runDuration < 30*time.Second {
+				s.activeMux.Lock()
+				wasCorruptRestart := s.corruptRestart
+				s.corruptRestart = false
+				s.activeMux.Unlock()
+
+				// Fast outage transition:
+				// - If 0 bytes were received on this attempt and there is only 1 source URL, go straight to outage screen (maxRetries = 1)
+				// - Otherwise try each source URL once (or 1 quick retry if stream was previously playing)
+				s.bytesMux.RLock()
+				gotAnyBytes := s.bytesRead > startBytes
+				s.bytesMux.RUnlock()
+
+				maxRetries := len(s.SourceURLs)
+				if !gotAnyBytes && len(s.SourceURLs) <= 1 {
+					maxRetries = 1
+				} else if maxRetries < 2 {
+					maxRetries = 2
+				}
+
+				if wasCorruptRestart {
+					// Stream was alive and delivering data, but killed by auto-heal to reset corrupted DVB/Ku-Band timestamps.
+					// Do NOT increment retryCount so prolonged rain fade won't blacklist/drop the channel.
+					s.consecutiveCorruptRestarts++
+					if s.consecutiveCorruptRestarts >= 2 && len(s.SourceURLs) > 1 {
+						s.activeMux.Lock()
+						s.currentSourceIdx = (s.currentSourceIdx + 1) % len(s.SourceURLs)
+						nextIdx := s.currentSourceIdx
+						s.activeMux.Unlock()
+						s.consecutiveCorruptRestarts = 0
+						log.Printf("🌧️  Repeated signal corruption on %s; failing over to backup source URL [%d/%d]",
+							s.ID, nextIdx+1, len(s.SourceURLs))
+					}
+				} else if runDuration < 30*time.Second || timeSinceLastData >= 4*time.Second {
+					// Consider the run failed/stalled if it died within 30s OR had no data flowing for >= 4s (watchdog kill)
 					s.retryCount++
 					s.lastFailTime = time.Now()
-					log.Printf("⚠️  FFmpeg died after %v for %s (retry: %d/2)", runDuration, s.ID, s.retryCount)
-				} else {
-					// Reset retry count if stream ran successfully for > 30 seconds
-					s.retryCount = 0
-				}
-
-				// Blacklist if failed 2 times in a row
-				if s.retryCount >= 2 {
-					s.isBlacklisted = true
-					log.Printf("🚫 Channel %s offline after %d consecutive failures; stopping restream.", s.ID, s.retryCount)
-
-					// Stop & remove the session so it can be recreated later when upstream is back.
-					if s.owner != nil {
-						s.owner.DeleteSession(s.ID)
+					// Rotate to next backup source URL if multiple sources are configured
+					if len(s.SourceURLs) > 1 {
+						s.activeMux.Lock()
+						s.currentSourceIdx = (s.currentSourceIdx + 1) % len(s.SourceURLs)
+						nextIdx := s.currentSourceIdx
+						s.activeMux.Unlock()
+						log.Printf("🔀 Rotating failover source for %s to URL [%d/%d] (retry: %d/%d)",
+							s.ID, nextIdx+1, len(s.SourceURLs), s.retryCount, maxRetries)
 					} else {
-						s.Stop()
+						log.Printf("⚠️  FFmpeg exited/stalled after %v for %s (retry: %d/%d)",
+							runDuration.Round(time.Second), s.ID, s.retryCount, maxRetries)
 					}
-					return
+				} else {
+					// Stream was healthy and actively receiving data for > 30s
+					s.retryCount = 0
+					s.consecutiveCorruptRestarts = 0
 				}
 
-				time.Sleep(2 * time.Second)
+				// Handle reaching max consecutive retries
+				if s.retryCount >= maxRetries {
+					if !s.IsOnDemand() {
+						// Always-on stream (on_demand=false): do not delete permanently; wait 15s and keep trying
+						log.Printf("⏳ Always-on stream %s reached %d retries; waiting 15s before retrying upstream...", s.ID, s.retryCount)
+						s.retryCount = 0
+						time.Sleep(15 * time.Second)
+					} else {
+						s.activeMux.Lock()
+						s.isBlacklisted = true
+						s.activeMux.Unlock()
+						log.Printf("🚫 Channel %s offline after %d consecutive failures; switching viewers to outage screen.", s.ID, s.retryCount)
+
+						// Stop & remove the session so connected clients immediately transition to ServeOutageNotification
+						// and the session can be recreated fresh when a viewer retries later.
+						if s.owner != nil {
+							s.owner.DeleteSession(s.ID)
+						} else {
+							s.Stop()
+						}
+						return
+					}
+				} else {
+					// Fast 1s backoff before retry/failover so viewers don't wait long
+					time.Sleep(1 * time.Second)
+				}
 
 				// Mark as inactive and try to restart
 				s.activeMux.Lock()
@@ -865,7 +1096,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 				stillHasClients := len(s.clients) > 0
 				s.clientsMux.RUnlock()
 				if (stillHasClients || !s.IsOnDemand()) && !s.isBlacklisted {
-					log.Printf("🔄 Auto-restarting FFmpeg: %s (attempt %d/5)", s.ID, s.retryCount+1)
+					log.Printf("🔄 Auto-restarting FFmpeg: %s (attempt %d/%d)", s.ID, s.retryCount+1, maxRetries)
 					go s.Start()
 				}
 			} else {
@@ -986,19 +1217,31 @@ func (s *FFmpegSession) GetStats() map[string]interface{} {
 	lastErrTime := s.lastErrorTime
 	s.errorMux.RUnlock()
 
+	s.activeMux.RLock()
+	activeIdx := s.currentSourceIdx
+	var activeURL string
+	if activeIdx >= 0 && activeIdx < len(s.SourceURLs) {
+		activeURL = s.SourceURLs[activeIdx]
+	}
+	sourceCount := len(s.SourceURLs)
+	s.activeMux.RUnlock()
+
 	return map[string]interface{}{
-		"id":              s.ID,
-		"active":          s.IsActive(),
-		"clients":         s.GetClientCount(),
-		"output_format":   s.OutputFormat,
-		"uptime_seconds":  uptime,
-		"last_activity":   s.lastActivity,
-		"bytes_read":      bytesRead,
-		"bytes_written":   bytesWritten,
-		"download_mbps":   downloadMbps,
-		"upload_mbps":     uploadMbps,
-		"last_error":      lastErr,
-		"last_error_time": lastErrTime,
+		"id":                  s.ID,
+		"active":              s.IsActive(),
+		"clients":             s.GetClientCount(),
+		"output_format":       s.OutputFormat,
+		"uptime_seconds":      uptime,
+		"last_activity":       s.lastActivity,
+		"bytes_read":          bytesRead,
+		"bytes_written":       bytesWritten,
+		"download_mbps":       downloadMbps,
+		"upload_mbps":         uploadMbps,
+		"last_error":          lastErr,
+		"last_error_time":     lastErrTime,
+		"active_source_index": activeIdx,
+		"active_source_url":   activeURL,
+		"source_count":        sourceCount,
 	}
 }
 

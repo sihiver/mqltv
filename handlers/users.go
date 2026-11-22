@@ -794,56 +794,46 @@ func GenerateUserPlaylist(w http.ResponseWriter, r *http.Request) {
 	}
 	rows.Close() // Close rows before creating relays
 
-	// Delete old relays for this user (cleanup before regenerating)
-	// Get old relay paths for this user's channels
-	oldRelayPaths := []string{}
-	oldRelayRows, err := database.DB.Query(`
-		SELECT DISTINCT output_path FROM relays 
-		WHERE output_path LIKE 'channel-%' 
-		AND output_path IN (
-			SELECT 'channel-' || c.id 
-			FROM channels c 
-			WHERE c.id IN (`+strings.Join(placeholders, ",")+`)
-		)
-	`, args...)
-	if err == nil {
-		for oldRelayRows.Next() {
-			var path string
-			if err := oldRelayRows.Scan(&path); err == nil {
-				oldRelayPaths = append(oldRelayPaths, path)
-			}
-		}
-		oldRelayRows.Close()
-
-		// Delete old relays
-		for _, path := range oldRelayPaths {
-			database.DB.Exec("DELETE FROM relays WHERE output_path = ?", path)
-		}
-	}
-
-	// Build M3U content
+	// Build M3U content while preserving any multi-source backup URLs configured in Relays
 	m3uContent := "#EXTM3U\n"
 	baseURL := publicBaseURL(r)
 
 	channelCount := 0
 	for _, ch := range channelsData {
-		// Create or get relay for this channel
+		// Create or update relay for this channel
 		relayPath := fmt.Sprintf("channel-%d", ch.ID)
 
-		// Check if relay exists, if not create it
 		var relayID int
-		err := database.DB.QueryRow("SELECT id FROM relays WHERE output_path = ?", relayPath).Scan(&relayID)
+		var existingSourceURLs string
+		err := database.DB.QueryRow("SELECT id, source_urls FROM relays WHERE output_path = ?", relayPath).Scan(&relayID, &existingSourceURLs)
 		if err == sql.ErrNoRows {
 			// Create new relay
-			sourceURLsJSON := fmt.Sprintf("[\"%s\"]", ch.SourceURL)
+			urlsJSON, _ := json.Marshal([]string{ch.SourceURL})
 			_, err = database.DB.Exec(
 				"INSERT INTO relays (name, source_urls, output_path, active) VALUES (?, ?, ?, 1)",
-				ch.Name, sourceURLsJSON, relayPath,
+				ch.Name, string(urlsJSON), relayPath,
 			)
 			if err != nil {
 				log.Printf("Failed to create relay for channel %d: %v", ch.ID, err)
 				continue
 			}
+		} else if err == nil {
+			// Preserve backup failover URLs if already configured in Relays
+			var existingURLs []string
+			_ = json.Unmarshal([]byte(existingSourceURLs), &existingURLs)
+			updatedURLs := []string{ch.SourceURL}
+			if len(existingURLs) > 1 {
+				for _, backupURL := range existingURLs[1:] {
+					if backupURL != "" && backupURL != ch.SourceURL {
+						updatedURLs = append(updatedURLs, backupURL)
+					}
+				}
+			}
+			urlsJSON, _ := json.Marshal(updatedURLs)
+			_, _ = database.DB.Exec(
+				"UPDATE relays SET name = ?, source_urls = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+				ch.Name, string(urlsJSON), relayID,
+			)
 		}
 
 		m3uContent += fmt.Sprintf("#EXTINF:-1 tvg-id=\"%d\" tvg-name=\"%s\" tvg-logo=\"%s\" group-title=\"%s\",%s\n",

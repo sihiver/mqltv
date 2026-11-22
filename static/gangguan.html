@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gangguan Sinyal Siaran - Silakan Coba Beberapa Saat Lagi</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: radial-gradient(circle at center, #111827 0%, #030712 100%);
+            color: #f9fafb;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+            padding: 20px;
+        }
+
+        .container {
+            text-align: center;
+            padding: 36px 28px;
+            max-width: 720px;
+            width: 100%;
+            background: rgba(17, 24, 39, 0.85);
+            border: 2px solid rgba(245, 158, 11, 0.6);
+            border-radius: 16px;
+            box-shadow: 0 0 40px rgba(245, 158, 11, 0.2);
+        }
+
+        .signal-icon-wrap {
+            position: relative;
+            width: 96px;
+            height: 96px;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: rgba(245, 158, 11, 0.15);
+            border: 2px solid #f59e0b;
+        }
+
+        .signal-icon-wrap::after {
+            content: '';
+            position: absolute;
+            inset: -8px;
+            border-radius: 50%;
+            border: 2px dashed rgba(245, 158, 11, 0.45);
+            animation: spin 10s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .signal-emoji {
+            font-size: 44px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.75; }
+        }
+
+        .outage-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+            margin-bottom: 22px;
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+            border: 1px solid rgba(251, 191, 36, 0.4);
+        }
+
+        .message {
+            color: #fbbf24;
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            text-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+        }
+
+        .sub-message {
+            color: #d1d5db;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .retry-box {
+            color: #38bdf8;
+            font-size: 18px;
+            font-weight: 600;
+            padding: 18px 20px;
+            background: rgba(56, 189, 248, 0.1);
+            border-radius: 10px;
+            border: 1.5px solid rgba(56, 189, 248, 0.45);
+            margin-bottom: 22px;
+        }
+
+        .countdown-text {
+            font-size: 14px;
+            color: #9ca3af;
+            margin-top: 8px;
+            font-weight: 400;
+        }
+
+        .btn-retry {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 28px;
+            background: #f59e0b;
+            color: #111827;
+            font-size: 15px;
+            font-weight: 700;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+
+        .btn-retry:hover {
+            background: #fbbf24;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="signal-icon-wrap">
+            <span class="signal-emoji">📡</span>
+        </div>
+
+        <div class="badge">Status Siaran • Pemulihan Otomatis</div>
+
+        <div class="message">
+            ⚠️ SEDANG TERJADI GANGGUAN SINYAL ⚠️
+        </div>
+
+        <div class="sub-message">
+            Mohon maaf, saluran ini sedang mengalami gangguan sementara akibat faktor cuaca
+            (hujan lebat / angin pada pemancar) atau gangguan jaringan upstream.<br>
+            Sistem kami sedang memulihkan siaran secara otomatis.
+        </div>
+
+        <img src="/gangguan-notification.png" alt="Gangguan Sinyal" class="outage-image" onerror="this.style.display='none'">
+
+        <div class="retry-box">
+            🔄 Silakan Mencoba Kembali Beberapa Saat Lagi
+            <div class="countdown-text">
+                Mencoba memuat ulang saluran secara otomatis dalam <strong id="timer" style="color: #fff;">15</strong> detik...
+            </div>
+        </div>
+
+        <button class="btn-retry" onclick="retryNow()">
+            🔄 Coba Lagi Sekarang
+        </button>
+    </div>
+
+    <script>
+        let seconds = 15;
+        const timerEl = document.getElementById('timer');
+        const params = new URLSearchParams(window.location.search);
+        const target = params.get('redirect') || window.location.href;
+
+        function retryNow() {
+            if (params.get('redirect')) {
+                window.location.href = params.get('redirect');
+            } else {
+                window.location.reload();
+            }
+        }
+
+        setInterval(() => {
+            seconds--;
+            if (timerEl) timerEl.textContent = seconds > 0 ? seconds : 0;
+            if (seconds <= 0) {
+                retryNow();
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
+

@@ -154,3 +154,168 @@ func startExpiredStream(videoPath string) {
 	cmd.Wait()
 	log.Printf("🛑 Expired notification stream stopped")
 }
+
+var (
+	outageStreamMux     sync.Mutex
+	outageStreamClients = make(map[string]chan []byte)
+	outageStreamActive  = false
+)
+
+// StreamOutageVideo streams the outage/disruption ("gangguan sinyal") screen in an infinite loop
+func StreamOutageVideo(w http.ResponseWriter, r *http.Request) {
+	videoPath := "./static/gangguan-notification.mp4"
+	imagePath := "./static/gangguan-notification.png"
+	htmlPath := "./static/gangguan.html"
+
+	// Auto-generate MP4 from PNG once if MP4 does not exist yet
+	if _, err := os.Stat(videoPath); err != nil {
+		if _, imgErr := os.Stat(imagePath); imgErr == nil {
+			ffmpegExe := getFFmpegExecutable()
+			genCmd := exec.Command(
+				ffmpegExe,
+				"-y",
+				"-loop", "1",
+				"-framerate", "25",
+				"-i", imagePath,
+				"-f", "lavfi",
+				"-i", "anullsrc=r=44100:cl=stereo",
+				"-t", "4",
+				"-c:v", "libx264",
+				"-preset", "fast",
+				"-tune", "stillimage",
+				"-pix_fmt", "yuv420p",
+				"-g", "12",
+				"-keyint_min", "12",
+				"-sc_threshold", "0",
+				"-bf", "0",
+				"-c:a", "aac",
+				"-b:a", "64k",
+				"-shortest",
+				videoPath,
+			)
+			_ = genCmd.Run()
+		}
+	}
+
+	// If MP4 still doesn't exist, fall back to HTML page
+	if _, err := os.Stat(videoPath); err != nil {
+		if _, htmlErr := os.Stat(htmlPath); htmlErr == nil {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+			http.ServeFile(w, r, htmlPath)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte("SEDANG TERJADI GANGGUAN SINYAL\n\nMohon maaf, saluran sedang mengalami gangguan sementara.\nSilakan mencoba kembali beberapa saat lagi."))
+		return
+	}
+
+	clientID := fmt.Sprintf("%x", md5.Sum([]byte(r.RemoteAddr+r.UserAgent()+fmt.Sprintf("%d", time.Now().UnixNano()))))
+	dataChan := make(chan []byte, 2000)
+
+	outageStreamMux.Lock()
+	outageStreamClients[clientID] = dataChan
+	if !outageStreamActive {
+		outageStreamActive = true
+		go startOutageStream(videoPath)
+	}
+	outageStreamMux.Unlock()
+
+	defer func() {
+		outageStreamMux.Lock()
+		delete(outageStreamClients, clientID)
+		close(dataChan)
+		outageStreamMux.Unlock()
+	}()
+
+	// Only set headers if not already written
+	w.Header().Set("Content-Type", "video/MP2T")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		return
+	}
+
+	for {
+		select {
+		case data, ok := <-dataChan:
+			if !ok {
+				return
+			}
+			if _, err := w.Write(data); err != nil {
+				return
+			}
+			flusher.Flush()
+		case <-r.Context().Done():
+			return
+		}
+	}
+}
+
+func startOutageStream(videoPath string) {
+	defer func() {
+		outageStreamMux.Lock()
+		outageStreamActive = false
+		outageStreamMux.Unlock()
+	}()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ffmpegExe := getFFmpegExecutable()
+	args := []string{
+		"-stream_loop", "-1",
+		"-re",
+		"-i", videoPath,
+		"-c", "copy",
+		"-f", "mpegts",
+		"-avoid_negative_ts", "make_zero",
+		"-mpegts_flags", "+resend_headers+initial_discontinuity",
+		"-max_muxing_queue_size", "9999",
+		"-flush_packets", "1",
+		"pipe:1",
+	}
+
+	cmd := exec.CommandContext(ctx, ffmpegExe, args...)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return
+	}
+	if err := cmd.Start(); err != nil {
+		return
+	}
+
+	buffer := make([]byte, 188*7)
+	for {
+		outageStreamMux.Lock()
+		clientCount := len(outageStreamClients)
+		outageStreamMux.Unlock()
+		if clientCount == 0 {
+			_ = cmd.Process.Kill()
+			break
+		}
+
+		n, err := stdout.Read(buffer)
+		if err != nil {
+			break
+		}
+		if n > 0 {
+			data := make([]byte, n)
+			copy(data, buffer[:n])
+			outageStreamMux.Lock()
+			for _, ch := range outageStreamClients {
+				select {
+				case ch <- data:
+				default:
+				}
+			}
+			outageStreamMux.Unlock()
+		}
+	}
+
+	_ = cmd.Wait()
+}
