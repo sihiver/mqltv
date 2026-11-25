@@ -2015,39 +2015,32 @@ func ProxyChannelHLS(w http.ResponseWriter, r *http.Request) {
 	session := ffmpegManager.GetOrCreateFFmpegSession(sessionID, []string{url}, "hls")
 	session.SetOnDemand(onDemandInt == 1)
 
-	clientID := fmt.Sprintf("%x", md5.Sum([]byte(fmt.Sprintf("%s|%s|%d", r.RemoteAddr, r.UserAgent(), time.Now().UnixNano()))))
-	dataChan, err := session.AddClient(clientID, r.RemoteAddr)
+	clientID := fmt.Sprintf("%x", md5.Sum([]byte(r.RemoteAddr+r.UserAgent())))
+	_, err = session.AddClient(clientID, r.RemoteAddr)
 	if err != nil {
 		ServeOutageNotification(w, r)
 		return
 	}
-	defer session.RemoveClient(clientID)
 
-	w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
-	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	m3u8Path := filepath.Join("hls_cache", sessionID, "index.m3u8")
+	fileExists := false
+	for i := 0; i < 30; i++ {
+		if _, err := os.Stat(m3u8Path); err == nil {
+			fileExists = true
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
 
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
+	if !fileExists {
+		ServeOutageNotification(w, r)
 		return
 	}
 
-	for {
-		select {
-		case data, ok := <-dataChan:
-			if !ok {
-				return
-			}
-			if _, err := w.Write(data); err != nil {
-				return
-			}
-			flusher.Flush()
-		case <-r.Context().Done():
-			return
-		}
-	}
+	w.Header().Set("Content-Type", "application/vnd.apple.mpegurl")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	http.ServeFile(w, r, m3u8Path)
 }
 
 // SaveGeneratedPlaylist saves a generated M3U playlist to static/playlists directory

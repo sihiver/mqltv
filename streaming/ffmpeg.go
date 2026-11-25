@@ -320,7 +320,6 @@ type FFmpegSession struct {
 type StreamPipe struct {
 	readers    map[string]chan []byte
 	readersMux sync.RWMutex
-	buffer     *RingBuffer
 }
 
 // FFmpegManager manages all FFmpeg sessions
@@ -419,7 +418,6 @@ func (m *FFmpegManager) GetOrCreateFFmpegSession(streamID string, sourceURLs []s
 		timeHistory:       make([]time.Time, 0, 10),
 		pipeWriter: &StreamPipe{
 			readers: make(map[string]chan []byte),
-			buffer:  NewRingBuffer(5 * 1024 * 1024), // 5MB buffer
 		},
 	}
 
@@ -512,24 +510,35 @@ func (s *FFmpegSession) AddClient(clientID, remoteAddr string) (chan []byte, err
 	s.clientsMux.Lock()
 	defer s.clientsMux.Unlock()
 
-	s.pipeWriter.readersMux.Lock()
-	dataChan, exists := s.pipeWriter.readers[clientID]
-	if !exists {
-		dataChan = make(chan []byte, 2000) // Large buffer to prevent packet drops
-		s.pipeWriter.readers[clientID] = dataChan
-	}
-	s.pipeWriter.readersMux.Unlock()
+	now := time.Now()
 
-	client := &StreamClient{
-		ID:         clientID,
-		Connected:  time.Now(),
-		RemoteAddr: remoteAddr,
-		Done:       make(chan bool, 1),
+	// For HLS output mode, clients read segments from disk rather than stdout pipe channel
+	var dataChan chan []byte
+	if s.OutputFormat != "hls" {
+		s.pipeWriter.readersMux.Lock()
+		var exists bool
+		dataChan, exists = s.pipeWriter.readers[clientID]
+		if !exists {
+			// 300 chunks (~1.5-2MB max buffer per client) prevents huge RAM bloat and 50-minute lag accumulation
+			dataChan = make(chan []byte, 300)
+			s.pipeWriter.readers[clientID] = dataChan
+		}
+		s.pipeWriter.readersMux.Unlock()
 	}
-	s.clients[clientID] = client
-	s.lastActivity = time.Now()
 
-	log.Printf("👤 Client connected to FFmpeg stream %s: %s (total: %d)", s.ID, clientID, len(s.clients))
+	if existing, ok := s.clients[clientID]; ok {
+		existing.LastSeen = now
+	} else {
+		s.clients[clientID] = &StreamClient{
+			ID:         clientID,
+			Connected:  now,
+			LastSeen:   now,
+			RemoteAddr: remoteAddr,
+			Done:       make(chan bool, 1),
+		}
+		log.Printf("👤 Client connected to FFmpeg stream %s: %s (total: %d)", s.ID, clientID, len(s.clients))
+	}
+	s.lastActivity = now
 
 	// Start FFmpeg if not active
 	if !s.IsActive() {
@@ -648,7 +657,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-reconnect_delay_max", strconv.Itoa(reconnectDelayMaxSeconds), // Max seconds between reconnects
 		"-timeout", strconv.Itoa(timeoutMicros), // Input timeout (microseconds)
 		"-user_agent", ua,
-		"-fflags", "+genpts", // Generate missing PTS cleanly without dropping keyframes
+		// NOTE: NO -fflags +genpts on copy mode (causes progressive PTS drift on 1080i 25fps/50tbr DVB streams over ~50 mins)
 		// NOTE: NO -fflags +discardcorrupt (drops keyframes at segment boundaries → gap → ExoPlayer crash)
 		// NOTE: NO -flags low_delay (causes ExoPlayer timestamp issues)
 		// NOTE: NO -re on live inputs (causes clock drift, HLS 404 segment skips, and TCP buffer overruns)
@@ -668,17 +677,17 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-f", "mpegts", // Output format MPEG-TS
 		// NOTE: NO -reset_timestamps 1 (causes container/bitstream PTS mismatch → ExoPlayer crash)
 		// NOTE: NO -avoid_negative_ts (causes timestamp manipulation → ExoPlayer crash)
-		// NOTE: NO -max_interleave_delta 0 (experimental, can cause issues)
 		"-max_muxing_queue_size", "4096",
 		"-mpegts_flags", "+resend_headers", // Periodically resend PAT/PMT so clients recover after glitches
-		"-flush_packets", "1",
-		"pipe:1", // Output to stdout
+		"pipe:1", // Output to stdout (natural MPEG-TS packet batching without -flush_packets 1 spam)
 	)
 
 	// If HLS output is requested
 	if s.OutputFormat == "hls" {
 		outputDir := filepath.Join("hls_cache", s.ID)
-		os.MkdirAll(outputDir, 0755)
+		// Purge any leftover HLS segments/playlists before starting fresh
+		_ = os.RemoveAll(outputDir)
+		_ = os.MkdirAll(outputDir, 0755)
 
 		args = []string{
 			"-threads", "1",
@@ -687,14 +696,14 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			"-reconnect_delay_max", strconv.Itoa(reconnectDelayMaxSeconds),
 			"-timeout", strconv.Itoa(timeoutMicros),
 			"-user_agent", ua,
-			"-fflags", "+genpts+discardcorrupt",
-			"-flags", "low_delay",
+			"-fflags", "+discardcorrupt",
 			"-analyzeduration", strconv.Itoa(analyzeMicros),
 			"-probesize", strconv.Itoa(probeBytes),
 			"-i", sourceURL,
 			"-map", "0:v:0?", // Map ONLY first video (prevents multi-stream crash)
 			"-map", "0:a:0?", // Map ONLY first audio
 			"-sn",            // Drop subtitles (can cause copy crash)
+			"-dn",
 			"-c", "copy",
 		}
 		if len(audioDelayArgs) > 0 {
@@ -704,7 +713,8 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 			"-f", "hls",
 			"-hls_time", "4",
 			"-hls_list_size", "6",
-			"-hls_flags", "delete_segments+append_list",
+			"-hls_delete_threshold", "1",
+			"-hls_flags", "delete_segments+omit_endlist", // Delete old segments strictly; NO append_list leftover buildup
 			"-progress", "pipe:1", // Send progress to stdout to keep watchdog alive
 			filepath.Join(outputDir, "index.m3u8"),
 		)
@@ -900,75 +910,93 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 					s.bytesRead += uint64(n)
 					s.bytesMux.Unlock()
 
-					var data []byte
 					if s.OutputFormat == "hls" {
-						data = make([]byte, n)
-						copy(data, buffer[:n])
-					} else {
-						// Enforce strict 188-byte MPEG-TS packet alignment & 0x47 sync byte framing
-						carry = append(carry, buffer[:n]...)
+						// HLS outputs -progress text to stdout; segments are served directly from disk
+						continue
+					}
 
-						if len(carry) < tsPacketSize {
+					// Enforce strict 188-byte MPEG-TS packet alignment & 0x47 sync byte framing
+					const minBatchBytes = tsPacketSize * 7 // 1316 bytes (7 MPEG-TS packets per chunk)
+					carry = append(carry, buffer[:n]...)
+
+					if len(carry) < minBatchBytes {
+						continue
+					}
+
+					// If not aligned to 0x47 sync byte, scan forward for two consecutive 0x47 sync bytes 188 bytes apart
+					if carry[0] != 0x47 {
+						if len(carry) < tsPacketSize*2 {
 							continue
 						}
-
-						// If not aligned to 0x47 sync byte, scan forward for two consecutive 0x47 sync bytes 188 bytes apart
-						if carry[0] != 0x47 {
-							if len(carry) < tsPacketSize*2 {
-								continue
-							}
-							syncIdx := -1
-							limit := len(carry) - tsPacketSize
-							for i := 0; i < limit; i++ {
-								if carry[i] == 0x47 && carry[i+tsPacketSize] == 0x47 {
-									syncIdx = i
-									break
-								}
-							}
-							if syncIdx > 0 {
-								carry = carry[syncIdx:]
-							} else if syncIdx < 0 {
-								// Keep last 188 bytes in case a sync byte is near the boundary
-								carry = carry[len(carry)-tsPacketSize:]
-								continue
+						syncIdx := -1
+						limit := len(carry) - tsPacketSize
+						for i := 0; i < limit; i++ {
+							if carry[i] == 0x47 && carry[i+tsPacketSize] == 0x47 {
+								syncIdx = i
+								break
 							}
 						}
-
-						alignedLen := (len(carry) / tsPacketSize) * tsPacketSize
-						if alignedLen == 0 {
-							continue
-						}
-
-						// Filter out MPEG-TS packets with Transport Error Indicator (TEI bit: packet[1] & 0x80 != 0)
-						// which commonly appear during Ku-Band satellite rain fade.
-						data = make([]byte, 0, alignedLen)
-						for offset := 0; offset < alignedLen; offset += tsPacketSize {
-							pkt := carry[offset : offset+tsPacketSize]
-							if pkt[0] == 0x47 && (pkt[1]&0x80) == 0 {
-								data = append(data, pkt...)
-							}
-						}
-
-						rem := len(carry) - alignedLen
-						if rem > 0 {
-							copy(carry[:rem], carry[alignedLen:])
-						}
-						carry = carry[:rem]
-
-						if len(data) == 0 {
+						if syncIdx > 0 {
+							remSync := len(carry) - syncIdx
+							copy(carry[:remSync], carry[syncIdx:])
+							carry = carry[:remSync]
+						} else if syncIdx < 0 {
+							// Keep last 188 bytes in-place without shrinking underlying slice capacity
+							copy(carry[:tsPacketSize], carry[len(carry)-tsPacketSize:])
+							carry = carry[:tsPacketSize]
 							continue
 						}
 					}
 
-					// Broadcast to all clients (blocking with large buffer prevents drops)
+					alignedLen := (len(carry) / tsPacketSize) * tsPacketSize
+					if alignedLen < minBatchBytes {
+						continue
+					}
+
+					// Filter out MPEG-TS packets with Transport Error Indicator (TEI bit: packet[1] & 0x80 != 0)
+					data := make([]byte, 0, alignedLen)
+					for offset := 0; offset < alignedLen; offset += tsPacketSize {
+						pkt := carry[offset : offset+tsPacketSize]
+						if pkt[0] == 0x47 && (pkt[1]&0x80) == 0 {
+							data = append(data, pkt...)
+						}
+					}
+
+					rem := len(carry) - alignedLen
+					if rem > 0 {
+						copy(carry[:rem], carry[alignedLen:])
+					}
+					carry = carry[:rem]
+
+					if len(data) == 0 {
+						continue
+					}
+
+					// Broadcast to all clients; if a client's buffer fills up (e.g. after ~50 mins of clock drift),
+					// purge old stale chunks ("hapus sisa video lama") so the client jumps cleanly to live edge
+					// instead of oscillating at 100% full and dropping every other packet forever!
 					s.pipeWriter.readersMux.RLock()
 					clientCount := len(s.pipeWriter.readers)
-					for _, ch := range s.pipeWriter.readers {
+					for clientID, ch := range s.pipeWriter.readers {
 						select {
 						case ch <- data:
 							// Sent successfully
 						default:
-							// Buffer full - skip this aligned chunk for this client
+							// Buffer full: purge oldest 75% of stale video chunks so stream becomes smooth immediately
+							drainCount := (cap(ch) * 3) / 4
+							dropped := 0
+							for i := 0; i < drainCount; i++ {
+								select {
+								case <-ch:
+									dropped++
+								default:
+								}
+							}
+							select {
+							case ch <- data:
+							default:
+							}
+							log.Printf("🧹 Flushed %d stale buffered chunks for slow/drifted client %s on %s to prevent stutter", dropped, clientID, s.ID)
 						}
 					}
 					s.pipeWriter.readersMux.RUnlock()
@@ -1133,6 +1161,11 @@ func (s *FFmpegSession) Stop() {
 	s.clientsMux.Lock()
 	s.clients = make(map[string]*StreamClient)
 	s.clientsMux.Unlock()
+
+	// Remove HLS segment cache directory immediately when HLS session stops
+	if s.OutputFormat == "hls" {
+		_ = os.RemoveAll(filepath.Join("hls_cache", s.ID))
+	}
 }
 
 // monitorSessions monitors and stops idle sessions
@@ -1148,6 +1181,18 @@ func (m *FFmpegManager) monitorSessions() {
 		toDelete := make([]string, 0)
 		m.sessionsMux.RLock()
 		for streamID, session := range m.sessions {
+			// Expire inactive polling HLS clients (> 30s without segment fetch) so HLS sessions can stop cleanly
+			if session.OutputFormat == "hls" {
+				session.clientsMux.Lock()
+				for cid, cl := range session.clients {
+					if !cl.LastSeen.IsZero() && time.Since(cl.LastSeen) > 30*time.Second {
+						delete(session.clients, cid)
+						log.Printf("👋 Expired idle HLS client %s from %s", cid, streamID)
+					}
+				}
+				session.clientsMux.Unlock()
+			}
+
 			if session.GetClientCount() != 0 {
 				continue
 			}
