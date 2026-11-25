@@ -640,12 +640,15 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 	ua := getFFmpegUserAgent()
 	audioDelayMs := getFFmpegAudioDelayMs()
 
+	isHLSInput := strings.Contains(strings.ToLower(sourceURL), ".m3u8")
+
 	var audioDelayArgs []string
 	if audioDelayMs != 0 {
 		// Bitstream filter to shift audio PTS/DTS without transcoding (saves CPU).
-		// Positive value delays audio (fixes audio playing earlier than video).
+		// Guard NOPTS so corrupted DVB packets with missing timestamps do not break setts evaluation.
 		delaySec := float64(audioDelayMs) / 1000.0
-		audioDelayArgs = []string{"-bsf:a", fmt.Sprintf("setts=ts=TS+(%g)/TB", delaySec)}
+		expr := fmt.Sprintf("setts=ts='if(eq(TS,NOPTS),NOPTS,TS+(%g)/TB)'", delaySec)
+		audioDelayArgs = []string{"-bsf:a", expr}
 		log.Printf("⏳ Audio delay configured: %d ms (%+.3fs) for stream %s", audioDelayMs, delaySec, s.ID)
 	}
 
@@ -658,9 +661,16 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-timeout", strconv.Itoa(timeoutMicros), // Input timeout (microseconds)
 		"-user_agent", ua,
 		// NOTE: NO -fflags +genpts on copy mode (causes progressive PTS drift on 1080i 25fps/50tbr DVB streams over ~50 mins)
-		// NOTE: NO -fflags +discardcorrupt (drops keyframes at segment boundaries → gap → ExoPlayer crash)
 		// NOTE: NO -flags low_delay (causes ExoPlayer timestamp issues)
 		// NOTE: NO -re on live inputs (causes clock drift, HLS 404 segment skips, and TCP buffer overruns)
+	}
+	// For raw MPEG-TS / DVB tuner inputs (.ts), drop corrupted PES packets (+discardcorrupt) so rain-fade
+	// garbage PTS/DTS values (e.g. 2^33 jumps) never reach the muxer and freeze client playback clocks.
+	// Keep +discardcorrupt off on HLS (.m3u8) inputs to avoid dropping keyframes at segment boundaries.
+	if !isHLSInput {
+		args = append(args, "-fflags", "+discardcorrupt")
+	}
+	args = append(args,
 		"-analyzeduration", strconv.Itoa(analyzeMicros), // Analysis duration (microseconds)
 		"-probesize", strconv.Itoa(probeBytes), // Probe size (bytes)
 		"-i", sourceURL, // Input URL
@@ -669,7 +679,7 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		"-sn",            // Drop subtitles
 		"-dn",            // Drop data streams (timed_id3, etc.)
 		"-c", "copy",     // Copy codec (no transcoding)
-	}
+	)
 	if len(audioDelayArgs) > 0 {
 		args = append(args, audioDelayArgs...)
 	}
@@ -804,11 +814,12 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 		}
 	}()
 
-	// Read FFmpeg stderr in background (for logging errors and auto-restarting on severe DTS/stream corruption)
+	// Read FFmpeg stderr in background (for logging errors and auto-restarting on severe output muxer desync)
 	go func() {
 		buf := make([]byte, 4096)
 		var corruptCount int
 		corruptWindowStart := time.Now()
+		var lastMinorCorruptLog time.Time
 
 		for {
 			n, err := stderr.Read(buf)
@@ -824,25 +835,27 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 					continue
 				}
 
-				// Detect severe muxer/timestamp desync or upstream segment/rain-fade/wind corruption ("kaset rusak" state)
+				// Detect TRUE output muxer timestamp desync or broken HLS segment playlist.
+				// NOTE: Do NOT count input demuxer "PES packet size mismatch" or "Packet corrupt" here:
+				// with +discardcorrupt FFmpeg already drops bad DVB packets cleanly, whereas killing FFmpeg
+				// every 15-20s resets MPEG-TS continuity counters and freezes connected players!
 				dtsErrors := strings.Count(errMsg, "Non-monotonous DTS") +
 					strings.Count(errMsg, "non monotonically increasing dts") +
-					strings.Count(errMsg, "PES packet size mismatch") +
-					strings.Count(errMsg, "out of order") +
+					strings.Count(errMsg, "Invalid DTS:") +
 					strings.Count(errMsg, "backward in time") +
 					strings.Count(errMsg, "Failed to open segment") +
 					strings.Count(errMsg, "Server returned 404")
 
-				// Cooldown 15s after start so heavy rain doesn't cause rapid 5s restart loops
-				if dtsErrors > 0 && time.Since(s.startTime) > 15*time.Second {
+				// Cooldown 60s after start so transient rain-fade never causes rapid kill-restart loops
+				if dtsErrors > 0 && time.Since(s.startTime) > 60*time.Second {
 					now := time.Now()
-					if now.Sub(corruptWindowStart) > 10*time.Second {
+					if now.Sub(corruptWindowStart) > 15*time.Second {
 						corruptWindowStart = now
 						corruptCount = 0
 					}
 					corruptCount += dtsErrors
-					if corruptCount >= 20 {
-						log.Printf("⚠️  Severe stream desync/rain-fade corruption detected for %s (%d errors in %v). Triggering clean auto-heal restart...",
+					if corruptCount >= 40 {
+						log.Printf("⚠️  Severe output muxer desync detected for %s (%d errors in %v). Triggering clean auto-heal restart...",
 							s.ID, corruptCount, now.Sub(corruptWindowStart).Round(time.Second))
 						corruptCount = 0
 						s.activeMux.Lock()
@@ -853,6 +866,16 @@ func (s *FFmpegSession) startFFmpeg(sourceURL string) bool {
 						}
 						return
 					}
+				}
+
+				// Rate-limit noisy input DVB packet-loss warnings so server.log doesn't flood during rain fade
+				isMinorCorrupt := strings.Contains(errMsg, "PES packet size mismatch") || strings.Contains(errMsg, "Packet corrupt")
+				if isMinorCorrupt && dtsErrors == 0 {
+					if time.Since(lastMinorCorruptLog) >= 10*time.Second {
+						lastMinorCorruptLog = time.Now()
+						log.Printf("⚠️  Upstream DVB packet loss discarded on %s: %s", s.ID, strings.TrimSpace(errMsg))
+					}
+					continue
 				}
 
 				// Log FFmpeg errors/warnings
