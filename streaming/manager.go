@@ -30,6 +30,7 @@ type StreamSession struct {
 type StreamClient struct {
 	ID         string
 	Connected  time.Time
+	LastSeen   time.Time
 	RemoteAddr string
 	Writer     io.Writer
 	Done       chan bool

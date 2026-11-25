@@ -53,7 +53,7 @@ func newHLSProxyCacheFromEnv() *hlsProxyCache {
 		dir = "/tmp/mqltv_hls_cache"
 	}
 
-	maxMB := int64(48)
+	maxMB := int64(16)
 	if v := os.Getenv("HLS_CACHE_MAX_MB"); v != "" {
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
 			maxMB = n
@@ -71,12 +71,45 @@ func newHLSProxyCacheFromEnv() *hlsProxyCache {
 			Timeout: 20 * time.Second,
 		},
 		entries:  map[string]*hlsCacheEntry{},
-		order:    make([]*hlsCacheEntry, 0, 1024),
+		order:    make([]*hlsCacheEntry, 0, 256),
 		inflight: map[string]*inflightFetch{},
 	}
 
+	// Purge any orphaned segment files left over from previous server runs
+	_ = os.RemoveAll(dir)
 	_ = os.MkdirAll(dir, 0o755)
+
+	// Periodically delete expired segment files so leftover video segments never pile up in /tmp
+	go c.cleanupExpiredLoop()
+
 	return c
+}
+
+func (c *hlsProxyCache) cleanupExpiredLoop() {
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		now := time.Now()
+		c.mu.Lock()
+		for i := len(c.order) - 1; i >= 0; i-- {
+			ent := c.order[i]
+			if now.After(ent.expiresAt) {
+				c.removeLocked(ent)
+			}
+		}
+		c.mu.Unlock()
+	}
+}
+
+func (c *hlsProxyCache) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries = map[string]*hlsCacheEntry{}
+	c.order = c.order[:0]
+	c.totalBytes = 0
+	_ = os.RemoveAll(c.dir)
+	_ = os.MkdirAll(c.dir, 0o755)
 }
 
 func (c *hlsProxyCache) ttlForURL(u string) time.Duration {

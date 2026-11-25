@@ -131,8 +131,9 @@ func TestFFmpeg(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ClearHLSCache clears all HLS cache files
+// ClearHLSCache clears all HLS cache files (both FFmpeg HLS cache and upstream HLS proxy cache)
 func ClearHLSCache(w http.ResponseWriter, r *http.Request) {
+	defaultHLSProxyCache.Clear()
 	cmd := exec.Command("sh", "-c", "rm -rf hls_cache/*")
 	err := cmd.Run()
 
