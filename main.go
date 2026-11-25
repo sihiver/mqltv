@@ -119,8 +119,9 @@ func main() {
 	r.Handle("/gangguan-notification.png", http.FileServer(http.FS(legacyStaticFS))).Methods("GET")
 
 	// Proxy channel stream (public with user auth - must be before api subrouter)
-	r.HandleFunc("/api/proxy/channel/{id}", handlers.ProxyChannel).Methods("GET")
+	r.HandleFunc("/api/proxy/channel/{id}/hls/{segment:.+}", handlers.ProxyChannelHLSSegment).Methods("GET")
 	r.HandleFunc("/api/proxy/channel/{id}/hls", handlers.ProxyChannelHLS).Methods("GET")
+	r.HandleFunc("/api/proxy/channel/{id}", handlers.ProxyChannel).Methods("GET")
 
 	// API routes (protected)
 	api := r.PathPrefix("/api").Subrouter()
